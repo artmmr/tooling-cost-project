@@ -47,3 +47,11 @@ def calculate_tooling(
     request: CalculationRequest,
 ) -> CalculationResponse:
     return calculate(request)
+
+
+@app.get("/")
+def root():
+    return {
+        "name": "Tooling Cost API",
+        "status": "Online"
+    }
