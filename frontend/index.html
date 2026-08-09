@@ -3,140 +3,548 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+
     <title>Tooling Cost &amp; Linked Processes</title>
+
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+
     <link
       href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=JetBrains+Mono:wght@400;500&display=swap"
       rel="stylesheet"
     />
+
     <link rel="stylesheet" href="styles.css" />
   </head>
+
   <body>
     <header>
       <h1>Tooling cost &amp; linked processes</h1>
+
       <p>
-        Web version of the Excel estimator: select process and quantity bands, part
-        dimensions, and transport distances; derived tooling should-price follows the same
-        structure as the workbook (Overview, Useful Data, Transport).
+        Web-based tooling should-cost estimator using process,
+        geometry, manufacturing location, machining assumptions,
+        and transport parameters.
       </p>
     </header>
 
     <nav class="tabs" aria-label="Sections">
-      <button type="button" data-tab="calc" aria-selected="true">Overview</button>
-      <button type="button" data-tab="params">Useful data</button>
-      <button type="button" data-tab="transport">Transport</button>
-      <button type="button" data-tab="links">Links</button>
-      <button type="button" data-tab="spi">SPI mold class</button>
+      <button
+        type="button"
+        data-tab="calc"
+        aria-selected="true"
+      >
+        Overview
+      </button>
+
+      <button
+        type="button"
+        data-tab="params"
+        aria-selected="false"
+      >
+        Useful data
+      </button>
+
+      <button
+        type="button"
+        data-tab="transport"
+        aria-selected="false"
+      >
+        Transport
+      </button>
+
+      <button
+        type="button"
+        data-tab="links"
+        aria-selected="false"
+      >
+        Links
+      </button>
+
+      <button
+        type="button"
+        data-tab="spi"
+        aria-selected="false"
+      >
+        SPI mold class
+      </button>
     </nav>
 
     <main>
-      <section id="panel-calc" class="panel active" aria-labelledby="calc-heading">
+      <!-- ======================================================
+           OVERVIEW
+           ====================================================== -->
+
+      <section
+        id="panel-calc"
+        class="panel active"
+        aria-labelledby="calc-heading"
+      >
         <div class="grid-two">
+          <!-- ================= INPUTS ================= -->
+
           <div class="card">
-            <h2 id="calc-heading">Inputs <span class="tag">Hypothesis</span></h2>
+            <h2 id="calc-heading">
+              Inputs
+              <span class="tag">Hypothesis</span>
+            </h2>
+
+            <!-- Manufacturing location -->
+
+            <p class="subhead">
+              Manufacturing location
+            </p>
 
             <div class="field">
-              <label for="inp-cycles">Needed cycles / qty band</label>
+              <label for="inp-country">
+                Manufacturing country
+              </label>
+
+              <select id="inp-country"></select>
+            </div>
+
+            <p class="hint">
+              Country selection loads benchmark manufacturing
+              rates. All benchmark values can be edited manually
+              below.
+            </p>
+
+            <!-- General tooling inputs -->
+
+            <p class="subhead">
+              Tooling requirements
+            </p>
+
+            <div class="field">
+              <label for="inp-cycles">
+                Needed cycles / quantity band
+              </label>
+
               <select id="inp-cycles"></select>
             </div>
+
             <div class="field">
-              <label for="inp-process">Process</label>
+              <label for="inp-process">
+                Process
+              </label>
+
               <select id="inp-process"></select>
             </div>
+
             <div class="field">
-              <label for="inp-pqty">Production quantity (index 1–30)</label>
+              <label for="inp-pqty">
+                Number of parts per mold
+              </label>
+
               <select id="inp-pqty"></select>
             </div>
 
-            <p class="subhead">Part dimension [mm]</p>
+            <!-- Part dimensions -->
+
+            <p class="subhead">
+              Part dimensions [mm]
+            </p>
+
             <div class="dim-row">
               <div class="field">
-                <label for="inp-l">Length</label>
-                <input id="inp-l" type="number" min="1" step="1" />
+                <label for="inp-l">
+                  Length
+                </label>
+
+                <input
+                  id="inp-l"
+                  type="number"
+                  min="1"
+                  step="1"
+                />
               </div>
+
               <div class="field">
-                <label for="inp-w">Width</label>
-                <input id="inp-w" type="number" min="1" step="1" />
+                <label for="inp-w">
+                  Width
+                </label>
+
+                <input
+                  id="inp-w"
+                  type="number"
+                  min="1"
+                  step="1"
+                />
               </div>
+
               <div class="field">
-                <label for="inp-h">Height</label>
-                <input id="inp-h" type="number" min="1" step="1" />
+                <label for="inp-h">
+                  Height
+                </label>
+
+                <input
+                  id="inp-h"
+                  type="number"
+                  min="1"
+                  step="1"
+                />
               </div>
             </div>
 
+            <!-- Transport -->
+
+            <p class="subhead">
+              Transport
+            </p>
+
             <div class="field">
-              <label for="inp-truck">Truck distance manufacturer → supplier [km]</label>
-              <input id="inp-truck" type="number" min="0" step="1" />
+              <label for="inp-truck">
+                Truck distance manufacturer → supplier [km]
+              </label>
+
+              <input
+                id="inp-truck"
+                type="number"
+                min="0"
+                step="1"
+              />
             </div>
+
             <div class="field">
-              <label for="inp-sea">Boat distance manufacturer → port [km]</label>
-              <input id="inp-sea" type="number" min="0" step="1" />
+              <label for="inp-sea">
+                Sea distance manufacturer → port [km]
+              </label>
+
+              <input
+                id="inp-sea"
+                type="number"
+                min="0"
+                step="1"
+              />
             </div>
+
+            <!-- Cooling -->
+
             <div class="field">
-              <label for="inp-cooling">Tooling includes cooling system</label>
+              <label for="inp-cooling">
+                Tooling includes cooling system
+              </label>
+
               <select id="inp-cooling"></select>
             </div>
 
-            <button id="calculate-btn" type="button" class="calculate-btn">
+            <!-- ==========================================
+                 ADVANCED COUNTRY COST ASSUMPTIONS
+                 ========================================== -->
+
+            <details class="assumptions-panel">
+              <summary>
+                Advanced cost assumptions
+              </summary>
+
+              <p class="hint">
+                Benchmark assumptions are automatically loaded
+                for the selected manufacturing country. Change
+                any value if you have more accurate supplier or
+                internal cost data.
+              </p>
+
+              <p class="subhead">
+                Engineering &amp; labor
+              </p>
+
+              <div class="assumptions-grid">
+                <div class="field">
+                  <label for="inp-engineering-rate">
+                    Engineering rate [€/h]
+                  </label>
+
+                  <input
+                    id="inp-engineering-rate"
+                    type="number"
+                    min="0.01"
+                    step="1"
+                  />
+                </div>
+
+                <div class="field">
+                  <label for="inp-assembly-rate">
+                    Assembly / operator rate [€/h]
+                  </label>
+
+                  <input
+                    id="inp-assembly-rate"
+                    type="number"
+                    min="0.01"
+                    step="1"
+                  />
+                </div>
+              </div>
+
+              <p class="subhead">
+                Machining rates
+              </p>
+
+              <div class="assumptions-grid">
+                <div class="field">
+                  <label for="inp-cnc3-rate">
+                    CNC 3-axis [€/h]
+                  </label>
+
+                  <input
+                    id="inp-cnc3-rate"
+                    type="number"
+                    min="0.01"
+                    step="1"
+                  />
+                </div>
+
+                <div class="field">
+                  <label for="inp-cnc5-rate">
+                    CNC 5-axis [€/h]
+                  </label>
+
+                  <input
+                    id="inp-cnc5-rate"
+                    type="number"
+                    min="0.01"
+                    step="1"
+                  />
+                </div>
+
+                <div class="field">
+                  <label for="inp-edm-rate">
+                    EDM [€/h]
+                  </label>
+
+                  <input
+                    id="inp-edm-rate"
+                    type="number"
+                    min="0.01"
+                    step="1"
+                  />
+                </div>
+
+                <div class="field">
+                  <label for="inp-grinding-rate">
+                    Grinding [€/h]
+                  </label>
+
+                  <input
+                    id="inp-grinding-rate"
+                    type="number"
+                    min="0.01"
+                    step="1"
+                  />
+                </div>
+              </div>
+
+              <p class="subhead">
+                Energy &amp; efficiency
+              </p>
+
+              <div class="assumptions-grid">
+                <div class="field">
+                  <label for="inp-electricity">
+                    Electricity [€/kWh]
+                  </label>
+
+                  <input
+                    id="inp-electricity"
+                    type="number"
+                    min="0.001"
+                    step="0.001"
+                  />
+                </div>
+
+                <div class="field">
+                  <label for="inp-machine-efficiency">
+                    Machine efficiency [%]
+                  </label>
+
+                  <input
+                    id="inp-machine-efficiency"
+                    type="number"
+                    min="1"
+                    max="100"
+                    step="1"
+                  />
+                </div>
+
+                <div class="field">
+                  <label for="inp-operator-efficiency">
+                    Operator efficiency [%]
+                  </label>
+
+                  <input
+                    id="inp-operator-efficiency"
+                    type="number"
+                    min="1"
+                    max="100"
+                    step="1"
+                  />
+                </div>
+              </div>
+
+              <p class="subhead">
+                Commercial assumptions
+              </p>
+
+              <div class="assumptions-grid">
+                <div class="field">
+                  <label for="inp-overhead-rate">
+                    Overhead [%]
+                  </label>
+
+                  <input
+                    id="inp-overhead-rate"
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="1"
+                  />
+                </div>
+
+                <div class="field">
+                  <label for="inp-margin-rate">
+                    Supplier margin [%]
+                  </label>
+
+                  <input
+                    id="inp-margin-rate"
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="1"
+                  />
+                </div>
+              </div>
+
+              <p class="hint">
+                Engineering, 5-axis CNC, EDM, grinding,
+                electricity, overhead, and margin are currently
+                stored as assumptions. Some are not yet directly
+                used by the existing Excel-derived calculation
+                model.
+              </p>
+
+              <button
+                id="reset-country-defaults"
+                type="button"
+                class="secondary-btn"
+              >
+                Reset to country defaults
+              </button>
+            </details>
+
+            <!-- Calculate -->
+
+            <button
+              id="calculate-btn"
+              type="button"
+              class="calculate-btn"
+            >
               Calculate tooling cost
             </button>
 
-            <p id="calc-status" class="hint" aria-live="polite"></p>
+            <p
+              id="calc-status"
+              class="hint"
+              aria-live="polite"
+            ></p>
 
             <p class="hint">
               Derived tooling material:
               <strong id="out-c12">—</strong>
+
               <span style="color: var(--muted)">
-                (cycles × process matrix → Lists!D2:D4)</span
-              >
+                (derived from cycle band and process)
+              </span>
             </p>
           </div>
 
-          <div class="card">
-            <h2>Outputs <span class="tag">Should price</span></h2>
-            <p class="subhead">Tooling dimension gross [mm]</p>
-            <p id="out-c13" class="hint" style="margin-top: 0">—</p>
+          <!-- ================= OUTPUTS ================= -->
 
-            <table class="outputs-table" id="out-main">
+          <div class="card">
+            <h2>
+              Outputs
+              <span class="tag">Should price</span>
+            </h2>
+
+            <p class="subhead">
+              Tooling dimensions gross [mm]
+            </p>
+
+            <p
+              id="out-c13"
+              class="hint"
+              style="margin-top: 0"
+            >
+              —
+            </p>
+
+            <table
+              class="outputs-table"
+              id="out-main"
+            >
               <tbody></tbody>
             </table>
 
-            <table class="outputs-table" style="margin-top: 0.5rem">
+            <table
+              class="outputs-table"
+              style="margin-top: 0.5rem"
+            >
               <tbody>
                 <tr class="total">
-                  <th>Total tooling should price</th>
-                  <td class="num" id="out-total">—</td>
+                  <th>
+                    Total tooling should price
+                  </th>
+
+                  <td
+                    class="num"
+                    id="out-total"
+                  >
+                    —
+                  </td>
                 </tr>
               </tbody>
             </table>
 
             <p class="note">
-              Values mirror the spreadsheet formulas on the Overview sheet (costs in
-              currency units as in the workbook). Adjust constants under
-              <strong>Useful data</strong> when your reference tables change.
+              Manufacturing rates are based on benchmark
+              assumptions for the selected country. User-edited
+              values override the benchmark before the request
+              is sent to the Python calculation engine.
             </p>
           </div>
         </div>
       </section>
 
-      <section id="panel-params" class="panel" aria-labelledby="params-heading">
+      <!-- ======================================================
+           USEFUL DATA
+           ====================================================== -->
+
+      <section
+        id="panel-params"
+        class="panel"
+        aria-labelledby="params-heading"
+      >
         <div class="card">
-          <h2 id="params-heading">Useful data (reference)</h2>
+          <h2 id="params-heading">
+            Useful data
+          </h2>
+
           <p class="hint">
-            Material removal rates, densities, bloc €/t, machine and operator rates — the
-            same values as the workbook’s <em>Useful Data</em> sheet (hard-coded in
-            <code>app.js</code> as <code>UD</code>).
+            Material removal rates, densities, block prices,
+            and other reference parameters used by the tooling
+            calculation engine.
           </p>
+
           <table class="ref-table">
             <thead>
               <tr>
                 <th>Grade</th>
                 <th>MRR [cm³/min]</th>
                 <th>Density [kg/m³]</th>
-                <th>Bloc €/t</th>
+                <th>Block €/t</th>
               </tr>
             </thead>
+
             <tbody>
               <tr>
                 <td>Aluminum</td>
@@ -144,12 +552,14 @@
                 <td>2710</td>
                 <td>2700</td>
               </tr>
+
               <tr>
                 <td>Steel</td>
                 <td>3.7338</td>
                 <td>7850</td>
                 <td>800</td>
               </tr>
+
               <tr>
                 <td>High strength steel</td>
                 <td>1.8669</td>
@@ -158,89 +568,141 @@
               </tr>
             </tbody>
           </table>
-          <p class="hint" style="margin-top: 1rem">
-            Milling machine <strong>150</strong> €/h, operator <strong>40</strong> €/h
-            (Useful Data C19:C20).
+
+          <p
+            class="hint"
+            style="margin-top: 1rem"
+          >
+            Machine and operator rates are now supplied through
+            manufacturing-country benchmark profiles and can be
+            overridden by the user.
           </p>
         </div>
       </section>
 
-      <section id="panel-transport" class="panel" aria-labelledby="transport-heading">
+      <!-- ======================================================
+           TRANSPORT
+           ====================================================== -->
+
+      <section
+        id="panel-transport"
+        class="panel"
+        aria-labelledby="transport-heading"
+      >
         <div class="card">
-          <h2 id="transport-heading">Transport parameters</h2>
+          <h2 id="transport-heading">
+            Transport parameters
+          </h2>
+
           <p class="hint">
-            Road: full truck cost <strong>1400</strong>, distance <strong>250</strong> km,
-            load <strong>18 000</strong> kg. Sea: container <strong>8000</strong>, sea leg
-            <strong>11 000 × 1.8</strong> km, load <strong>27 000</strong> kg — as in the
-            workbook Transport sheet.
+            Road: full truck cost <strong>1400</strong>,
+            distance <strong>250</strong> km,
+            load <strong>18,000</strong> kg.
+            Sea: container <strong>8000</strong>,
+            sea leg <strong>11,000 × 1.8</strong> km,
+            load <strong>27,000</strong> kg.
           </p>
+
           <table class="ref-table">
             <thead>
               <tr>
                 <th>Mode</th>
-                <th>Derived € / 100 km truck</th>
+                <th>Derived rate</th>
                 <th>Load [kg]</th>
               </tr>
             </thead>
+
             <tbody>
               <tr>
                 <td>Road</td>
-                <td>560</td>
-                <td>18 000</td>
+                <td>560 € / 100 km</td>
+                <td>18,000</td>
               </tr>
+
               <tr>
                 <td>Sea</td>
-                <td>≈ 404.04 € / 1000 km (from workbook)</td>
-                <td>27 000</td>
+                <td>≈ 404.04 € / 1000 km</td>
+                <td>27,000</td>
               </tr>
             </tbody>
           </table>
         </div>
       </section>
 
-      <section id="panel-links" class="panel" aria-labelledby="links-heading">
+      <!-- ======================================================
+           LINKS
+           ====================================================== -->
+
+      <section
+        id="panel-links"
+        class="panel"
+        aria-labelledby="links-heading"
+      >
         <div class="card">
-          <h2 id="links-heading">Links</h2>
+          <h2 id="links-heading">
+            Links
+          </h2>
+
           <ul class="links-list">
             <li>
               <a
                 href="https://www.mimatic.de/Portals/0/PDF/Zerspanung/SolidCUT/Schnittdaten_SolidCUT_2_EN.pdf"
                 target="_blank"
                 rel="noopener noreferrer"
-                >Schnittdaten SolidCUT (mimatic.de)</a
               >
+                Schnittdaten SolidCUT (mimatic.de)
+              </a>
             </li>
+
             <li>
               <a
                 href="https://web.mit.edu/2.810/www/files/readings/Polgar_TimeEstimation.pdf"
                 target="_blank"
                 rel="noopener noreferrer"
-                >Polgar — time estimation (MIT)</a
               >
+                Polgar — time estimation (MIT)
+              </a>
             </li>
+
             <li>
               <a
                 href="https://www.cncfraises.fr/content/16-fraisage-definir-les-parametres-de-coupe"
                 target="_blank"
                 rel="noopener noreferrer"
-                >Fraisage — paramètres de coupe (CncFraises)</a
               >
+                Fraisage — paramètres de coupe
+                (CncFraises)
+              </a>
             </li>
+
             <li>
               <a
                 href="https://kingsunmachining.com/fr/blog/how-much-does-cnc-machining-cost-per-hour/"
                 target="_blank"
                 rel="noopener noreferrer"
-                >CNC machining cost per hour (Kingsun)</a
               >
+                CNC machining cost per hour
+                (Kingsun)
+              </a>
             </li>
           </ul>
         </div>
       </section>
 
-      <section id="panel-spi" class="panel" aria-labelledby="spi-heading">
+      <!-- ======================================================
+           SPI
+           ====================================================== -->
+
+      <section
+        id="panel-spi"
+        class="panel"
+        aria-labelledby="spi-heading"
+      >
         <div class="card">
-          <h2 id="spi-heading">SPI mold class (reference)</h2>
+          <h2 id="spi-heading">
+            SPI mold class
+          </h2>
+
           <table class="ref-table">
             <thead>
               <tr>
@@ -249,27 +711,32 @@
                 <th>Cycles</th>
               </tr>
             </thead>
+
             <tbody>
               <tr>
                 <td>101</td>
                 <td>High</td>
                 <td>Over 1 million</td>
               </tr>
+
               <tr>
                 <td>102</td>
                 <td>Medium-to-High</td>
                 <td>500,000 to 1 million</td>
               </tr>
+
               <tr>
                 <td>103</td>
                 <td>Medium</td>
                 <td>Under 500,000</td>
               </tr>
+
               <tr>
                 <td>104</td>
                 <td>Low</td>
                 <td>Less than 100,000</td>
               </tr>
+
               <tr>
                 <td>105</td>
                 <td>Prototype</td>
