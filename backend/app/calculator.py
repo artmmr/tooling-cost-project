@@ -1,14 +1,13 @@
 from math import ceil
 
 from app.constants import (
-    MACHINE_RATE_PER_HOUR,
     MATERIALS,
-    OPERATOR_RATE_PER_HOUR,
     ROAD_COST_PER_100_KM,
     ROAD_LOAD_KG,
     SEA_COST_PER_1000_KM,
     SEA_LOAD_KG,
 )
+
 from app.models import (
     CalculationRequest,
     CalculationResponse,
@@ -63,8 +62,9 @@ def calculate_cooling_cost(
     if not includes_cooling:
         return 0
 
-    # These ranges need to be confirmed against the workbook.
-    # The original JavaScript contains overlapping conditions.
+    # Current benchmark ranges.
+    # These should eventually be validated
+    # against real tooling quotations.
     if tooling_weight_kg < 500:
         return 5000
 
@@ -86,6 +86,11 @@ def calculate_cooling_cost(
 def calculate(
     request: CalculationRequest,
 ) -> CalculationResponse:
+
+    # ---------------------------------------------------------
+    # 1. Determine tooling material
+    # ---------------------------------------------------------
+
     cycle_category = CYCLE_CATEGORY[
         request.cycle_band.value
     ]
@@ -101,11 +106,21 @@ def calculate(
 
     material = MATERIALS[material_key]
 
+
+    # ---------------------------------------------------------
+    # 2. Input values
+    # ---------------------------------------------------------
+
     parts_per_mold = request.parts_per_mold
 
     part_length = request.part.length_mm
     part_width = request.part.width_mm
     part_height = request.part.height_mm
+
+
+    # ---------------------------------------------------------
+    # 3. Gross tooling dimensions
+    # ---------------------------------------------------------
 
     gross_length_mm = (
         part_length * parts_per_mold
@@ -118,10 +133,16 @@ def calculate(
     )
 
     gross_height_mm = (
-        part_height / 2
+        part_height
+        / 2
         * 3
         * 2
     )
+
+
+    # ---------------------------------------------------------
+    # 4. Tooling volume and weight
+    # ---------------------------------------------------------
 
     gross_volume_m3 = (
         gross_length_mm
@@ -134,6 +155,11 @@ def calculate(
         gross_volume_m3
         * material.density_kg_m3
     )
+
+
+    # ---------------------------------------------------------
+    # 5. Machining volumes
+    # ---------------------------------------------------------
 
     outside_machining_volume_m3 = (
         (
@@ -148,6 +174,7 @@ def calculate(
         )
     ) / 1_000_000_000
 
+
     inside_machining_volume_m3 = (
         part_length
         * part_width
@@ -156,15 +183,26 @@ def calculate(
         * parts_per_mold
     )
 
+
     total_machining_volume_m3 = (
         inside_machining_volume_m3
         + outside_machining_volume_m3
     )
 
+
+    # ---------------------------------------------------------
+    # 6. Milling tool consumption
+    # ---------------------------------------------------------
+
     milling_time_index = ceil(
         total_machining_volume_m3
         / material.milling_volume_factor
     )
+
+
+    # ---------------------------------------------------------
+    # 7. Removed-volume machining time
+    # ---------------------------------------------------------
 
     removed_volume_time_min = (
         (
@@ -173,17 +211,55 @@ def calculate(
             / material.removal_rate_cm3_min
         )
         * parts_per_mold
-        + (
+        +
+        (
             outside_machining_volume_m3
             * 1_000_000
             / material.removal_rate_cm3_min
         )
     )
 
+
+    # ---------------------------------------------------------
+    # 8. Country / user-specific machining rates
+    # ---------------------------------------------------------
+
+    machine_rate_per_hour = (
+        request.assumptions.cnc_3_axis_rate
+    )
+
+    operator_rate_per_hour = (
+        request.assumptions.assembly_rate
+    )
+
+
+    # Efficiency converts nominal hourly rates
+    # into effective productive-hour rates.
+    #
+    # Example:
+    # €100/h machine at 80% efficiency
+    # = €125 per productive hour.
+
+    effective_machine_rate_per_hour = (
+        machine_rate_per_hour
+        / request.assumptions.machine_efficiency
+    )
+
+    effective_operator_rate_per_hour = (
+        operator_rate_per_hour
+        / request.assumptions.operator_efficiency
+    )
+
+
     hourly_cost_per_minute = (
-        MACHINE_RATE_PER_HOUR
-        + OPERATOR_RATE_PER_HOUR
+        effective_machine_rate_per_hour
+        + effective_operator_rate_per_hour
     ) / 60
+
+
+    # ---------------------------------------------------------
+    # 9. Tooling material cost
+    # ---------------------------------------------------------
 
     material_cost = (
         tooling_weight_kg
@@ -195,10 +271,20 @@ def calculate(
         * 1.4
     )
 
+
+    # ---------------------------------------------------------
+    # 10. Raw material transformation
+    # ---------------------------------------------------------
+
     transformation_cost = (
         material_cost * 1.5
         - material_cost
     )
+
+
+    # ---------------------------------------------------------
+    # 11. Outside machining cost
+    # ---------------------------------------------------------
 
     outside_machining_cost = (
         outside_machining_volume_m3
@@ -207,6 +293,11 @@ def calculate(
         * hourly_cost_per_minute
         * 1.25
     )
+
+
+    # ---------------------------------------------------------
+    # 12. Inside machining cost
+    # ---------------------------------------------------------
 
     inside_machining_cost = (
         inside_machining_volume_m3
@@ -217,15 +308,30 @@ def calculate(
         * parts_per_mold
     )
 
+
+    # ---------------------------------------------------------
+    # 13. Milling-tool cost
+    # ---------------------------------------------------------
+
     milling_tool_cost = (
         milling_time_index
         * material.milling_tool_price
     )
 
+
+    # ---------------------------------------------------------
+    # 14. Cooling cost
+    # ---------------------------------------------------------
+
     cooling_cost = calculate_cooling_cost(
         tooling_weight_kg=tooling_weight_kg,
         includes_cooling=request.includes_cooling,
     )
+
+
+    # ---------------------------------------------------------
+    # 15. Base manufacturing cost
+    # ---------------------------------------------------------
 
     base_cost = (
         material_cost
@@ -236,6 +342,21 @@ def calculate(
         + cooling_cost
     )
 
+
+    # ---------------------------------------------------------
+    # 16. Existing Excel commercial adjustments
+    # ---------------------------------------------------------
+    #
+    # For now these stay unchanged.
+    #
+    # We are NOT yet applying:
+    #
+    # request.assumptions.overhead_rate
+    # request.assumptions.margin_rate
+    #
+    # because the workbook already includes several
+    # markup/margin components.
+
     margin = (
         base_cost * 1.2
         - base_cost
@@ -245,6 +366,11 @@ def calculate(
         base_cost * 1.05
         - base_cost
     )
+
+
+    # ---------------------------------------------------------
+    # 17. Transport
+    # ---------------------------------------------------------
 
     road_transport_cost = (
         request.truck_distance_km
@@ -257,6 +383,7 @@ def calculate(
         * 2
     )
 
+
     sea_transport_cost = (
         request.sea_distance_km
         / 1000
@@ -268,10 +395,16 @@ def calculate(
         * 2
     )
 
+
     transport_cost = (
         road_transport_cost
         + sea_transport_cost
     )
+
+
+    # ---------------------------------------------------------
+    # 18. Final price
+    # ---------------------------------------------------------
 
     total_before_final_markup = (
         base_cost
@@ -280,39 +413,65 @@ def calculate(
         + transport_cost
     )
 
+
     total_price = (
         total_before_final_markup
         * 1.1
     )
 
+
+    # ---------------------------------------------------------
+    # 19. API response
+    # ---------------------------------------------------------
+
     return CalculationResponse(
         tooling_material=material.name,
+
         gross_length_mm=gross_length_mm,
         gross_width_mm=gross_width_mm,
         gross_height_mm=gross_height_mm,
+
         tooling_weight_kg=tooling_weight_kg,
+
         outside_machining_volume_m3=(
             outside_machining_volume_m3
         ),
+
         inside_machining_volume_m3=(
             inside_machining_volume_m3
         ),
+
         milling_time_index=milling_time_index,
+
         removed_volume_time_min=(
             removed_volume_time_min
         ),
+
         material_cost=material_cost,
-        transformation_cost=transformation_cost,
+
+        transformation_cost=(
+            transformation_cost
+        ),
+
         outside_machining_cost=(
             outside_machining_cost
         ),
+
         inside_machining_cost=(
             inside_machining_cost
         ),
-        milling_tool_cost=milling_tool_cost,
+
+        milling_tool_cost=(
+            milling_tool_cost
+        ),
+
         cooling_cost=cooling_cost,
+
         margin=margin,
+
         handling_cost=handling_cost,
+
         transport_cost=transport_cost,
+
         total_price=total_price,
     )

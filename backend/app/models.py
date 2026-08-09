@@ -26,10 +26,30 @@ class PartDimensions(BaseModel):
     height_mm: float = Field(gt=0)
 
 
+class CostAssumptions(BaseModel):
+    engineering_rate: float = Field(gt=0)
+    assembly_rate: float = Field(gt=0)
+
+    cnc_3_axis_rate: float = Field(gt=0)
+    cnc_5_axis_rate: float = Field(gt=0)
+    edm_rate: float = Field(gt=0)
+    grinding_rate: float = Field(gt=0)
+
+    electricity_eur_kwh: float = Field(gt=0)
+
+    machine_efficiency: float = Field(gt=0, le=1)
+    operator_efficiency: float = Field(gt=0, le=1)
+
+    overhead_rate: float = Field(ge=0, le=1)
+    margin_rate: float = Field(ge=0, le=1)
+
+
 class CalculationRequest(BaseModel):
     cycle_band: CycleBand
     process: ProcessType
     parts_per_mold: int = Field(ge=1, le=30)
+
+    manufacturing_country: str
 
     truck_distance_km: float = Field(ge=0)
     sea_distance_km: float = Field(ge=0)
@@ -38,6 +58,7 @@ class CalculationRequest(BaseModel):
 
     part: PartDimensions
 
+    assumptions: CostAssumptions
 
 class CalculationResponse(BaseModel):
     tooling_material: str

@@ -1,5 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi import FastAPI, HTTPException
+
+from app.country_profiles import COUNTRY_PROFILES
 
 from app.calculator import calculate
 from app.models import CalculationRequest, CalculationResponse
@@ -45,3 +48,32 @@ def calculate_tooling(
     request: CalculationRequest,
 ) -> CalculationResponse:
     return calculate(request)
+
+
+@app.get("/api/countries")
+def get_countries():
+    return [
+        {
+            "code": code,
+            "name": profile["name"],
+        }
+        for code, profile in COUNTRY_PROFILES.items()
+    ]
+
+
+@app.get("/api/countries/{country_code}")
+def get_country_profile(country_code: str):
+    country_code = country_code.upper()
+
+    profile = COUNTRY_PROFILES.get(country_code)
+
+    if profile is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Country not found",
+        )
+
+    return {
+        "code": country_code,
+        **profile,
+    }
