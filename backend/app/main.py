@@ -1,5 +1,3 @@
-import os
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -13,25 +11,25 @@ app = FastAPI(
 )
 
 
-frontend_origins = os.getenv(
-    "FRONTEND_ORIGINS",
-    "http://127.0.0.1:5500,http://localhost:5500",
-)
-
-allowed_origins = [
-    origin.strip()
-    for origin in frontend_origins.split(",")
-    if origin.strip()
-]
-
-
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allowed_origins,
+    allow_origins=[
+        "http://127.0.0.1:5500",
+        "http://localhost:5500",
+        "https://frabjous-parfait-6e9800.netlify.app",
+    ],
     allow_credentials=False,
-    allow_methods=["GET", "POST"],
+    allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["Content-Type"],
 )
+
+
+@app.get("/")
+def root():
+    return {
+        "name": "Tooling Cost API",
+        "status": "online",
+    }
 
 
 @app.get("/health")
@@ -47,11 +45,3 @@ def calculate_tooling(
     request: CalculationRequest,
 ) -> CalculationResponse:
     return calculate(request)
-
-
-@app.get("/")
-def root():
-    return {
-        "name": "Tooling Cost API",
-        "status": "Online"
-    }
