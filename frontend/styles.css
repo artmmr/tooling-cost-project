@@ -215,9 +215,7 @@ main {
 
 @media (min-width: 1100px) {
   .price-card {
-    position: sticky;
-    top: 78px;
-    z-index: 4;
+    position: static;
   }
 }
 
