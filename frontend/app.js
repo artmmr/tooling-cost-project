@@ -2,6 +2,15 @@ const API_BASE_URL =
   "https://tooling-cost-project.onrender.com";
 
 
+let currentToolingDefaults = null;
+let currentToolingMaterialFamily = null;
+let currentCountryDefaults = null;
+
+
+/* =========================================================
+   Lists
+   ========================================================= */
+
 const LISTS = {
   cycles: [
     {
@@ -71,7 +80,91 @@ const LISTS = {
 };
 
 
-let currentCountryDefaults = null;
+const PLASTIC_PROCESSES = new Set([
+  "plastic_molding",
+  "plastic_injection",
+  "foaming",
+  "thermoforming",
+]);
+
+
+const METAL_PROCESSES = new Set([
+  "metal_molding",
+  "stamping",
+  "forming",
+  "deep_drawing",
+]);
+
+
+const PLASTIC_MATERIALS = [
+  {
+    value: "standard_thermoplastic",
+    label: "Standard thermoplastic",
+  },
+  {
+    value: "glass_filled_thermoplastic",
+    label: "Glass-filled thermoplastic",
+  },
+  {
+    value: "mineral_filled_thermoplastic",
+    label: "Mineral-filled thermoplastic",
+  },
+  {
+    value: "corrosive_polymer",
+    label: "Corrosive / aggressive polymer",
+  },
+  {
+    value: "thermoset",
+    label: "Thermoset",
+  },
+  {
+    value: "elastomer",
+    label: "Elastomer",
+  },
+  {
+    value: "other",
+    label: "Other",
+  },
+];
+
+
+const METAL_MATERIALS = [
+  {
+    value: "mild_steel",
+    label: "Mild steel",
+  },
+  {
+    value: "high_strength_steel",
+    label: "High-strength steel",
+  },
+  {
+    value: "advanced_high_strength_steel",
+    label: "Advanced high-strength steel (AHSS)",
+  },
+  {
+    value: "stainless_steel",
+    label: "Stainless steel",
+  },
+  {
+    value: "aluminum_sheet",
+    label: "Aluminum",
+  },
+  {
+    value: "copper_brass",
+    label: "Copper / brass",
+  },
+  {
+    value: "other",
+    label: "Other",
+  },
+];
+
+
+const CYCLE_DEFAULTS = {
+  up_to_10000: 5000,
+  "10000_to_100000": 50000,
+  "100000_to_250000": 150000,
+};
 
 
 /* =========================================================
@@ -86,10 +179,13 @@ function fmt(number, decimals = 2) {
     return "—";
   }
 
-  return number.toLocaleString(undefined, {
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
-  });
+  return number.toLocaleString(
+    undefined,
+    {
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals,
+    },
+  );
 }
 
 
@@ -98,7 +194,8 @@ function fmt(number, decimals = 2) {
    ========================================================= */
 
 function fillSelect(id, options) {
-  const element = document.getElementById(id);
+  const element =
+    document.getElementById(id);
 
   element.innerHTML = options
     .map((option) => {
@@ -135,10 +232,13 @@ async function loadCountries() {
     );
   }
 
-  const countries = await response.json();
+  const countries =
+    await response.json();
 
   const select =
-    document.getElementById("inp-country");
+    document.getElementById(
+      "inp-country",
+    );
 
   select.innerHTML = countries
     .map(
@@ -152,7 +252,9 @@ async function loadCountries() {
 }
 
 
-async function loadCountryDefaults(countryCode) {
+async function loadCountryDefaults(
+  countryCode,
+) {
   setStatus(
     "Loading country benchmark assumptions...",
   );
@@ -167,11 +269,15 @@ async function loadCountryDefaults(countryCode) {
     );
   }
 
-  const profile = await response.json();
+  const profile =
+    await response.json();
 
-  currentCountryDefaults = profile;
+  currentCountryDefaults =
+    profile;
 
-  applyCountryDefaults(profile);
+  applyCountryDefaults(
+    profile,
+  );
 
   setStatus(
     `${profile.name} benchmark assumptions loaded.`,
@@ -179,34 +285,43 @@ async function loadCountryDefaults(countryCode) {
 }
 
 
-function applyCountryDefaults(profile) {
+function applyCountryDefaults(
+  profile,
+) {
   document.getElementById(
     "inp-engineering-rate",
-  ).value = profile.engineering_rate;
+  ).value =
+    profile.engineering_rate;
 
   document.getElementById(
     "inp-assembly-rate",
-  ).value = profile.assembly_rate;
+  ).value =
+    profile.assembly_rate;
 
   document.getElementById(
     "inp-cnc3-rate",
-  ).value = profile.cnc_3_axis_rate;
+  ).value =
+    profile.cnc_3_axis_rate;
 
   document.getElementById(
     "inp-cnc5-rate",
-  ).value = profile.cnc_5_axis_rate;
+  ).value =
+    profile.cnc_5_axis_rate;
 
   document.getElementById(
     "inp-edm-rate",
-  ).value = profile.edm_rate;
+  ).value =
+    profile.edm_rate;
 
   document.getElementById(
     "inp-grinding-rate",
-  ).value = profile.grinding_rate;
+  ).value =
+    profile.grinding_rate;
 
   document.getElementById(
     "inp-electricity",
-  ).value = profile.electricity_eur_kwh;
+  ).value =
+    profile.electricity_eur_kwh;
 
   document.getElementById(
     "inp-machine-efficiency",
@@ -231,10 +346,328 @@ function applyCountryDefaults(profile) {
 
 
 /* =========================================================
+   Tooling material defaults
+   ========================================================= */
+
+async function loadToolingMaterialDefaults(
+  materialCode,
+) {
+  const response = await fetch(
+    `${API_BASE_URL}/api/tooling-materials/${materialCode}`,
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      "Could not load tooling material defaults.",
+    );
+  }
+
+  const profile =
+    await response.json();
+
+  currentToolingDefaults =
+    profile;
+
+  currentToolingMaterialFamily =
+    materialCode;
+
+  applyToolingMaterialDefaults(
+    profile,
+  );
+}
+
+
+function applyToolingMaterialDefaults(
+  profile,
+) {
+  document.getElementById(
+    "inp-tool-density",
+  ).value =
+    profile.density_kg_m3;
+
+  document.getElementById(
+    "inp-tool-price",
+  ).value =
+    profile.block_price_per_tonne;
+
+  document.getElementById(
+    "inp-tool-mrr",
+  ).value =
+    profile.removal_rate_cm3_min;
+
+  document.getElementById(
+    "inp-milling-volume-factor",
+  ).value =
+    profile.milling_volume_factor;
+
+  document.getElementById(
+    "inp-milling-tool-price",
+  ).value =
+    profile.milling_tool_price;
+
+  document.getElementById(
+    "inp-heat-treatment",
+  ).value =
+    profile.heat_treatment_eur_per_kg;
+
+  document.getElementById(
+    "inp-route-cnc3",
+  ).value =
+    profile.route.cnc_3_axis_share * 100;
+
+  document.getElementById(
+    "inp-route-cnc5",
+  ).value =
+    profile.route.cnc_5_axis_share * 100;
+
+  document.getElementById(
+    "inp-route-edm",
+  ).value =
+    profile.route.edm_share * 100;
+
+  document.getElementById(
+    "inp-route-grinding",
+  ).value =
+    profile.route.grinding_share * 100;
+
+  updateRouteTotal();
+}
+
+
+/* =========================================================
+   Manufacturing route total
+   ========================================================= */
+
+function getRouteTotal() {
+  const cnc3 =
+    Number.parseFloat(
+      document.getElementById(
+        "inp-route-cnc3",
+      ).value,
+    ) || 0;
+
+  const cnc5 =
+    Number.parseFloat(
+      document.getElementById(
+        "inp-route-cnc5",
+      ).value,
+    ) || 0;
+
+  const edm =
+    Number.parseFloat(
+      document.getElementById(
+        "inp-route-edm",
+      ).value,
+    ) || 0;
+
+  const grinding =
+    Number.parseFloat(
+      document.getElementById(
+        "inp-route-grinding",
+      ).value,
+    ) || 0;
+
+  return (
+    cnc3 +
+    cnc5 +
+    edm +
+    grinding
+  );
+}
+
+
+function updateRouteTotal() {
+  const total =
+    getRouteTotal();
+
+  const element =
+    document.getElementById(
+      "route-total",
+    );
+
+  element.textContent =
+    `${total.toFixed(0)}%`;
+
+  element.classList.toggle(
+    "err",
+    Math.abs(total - 100) > 0.01,
+  );
+}
+
+
+/* =========================================================
+   Process-specific material choices
+   ========================================================= */
+
+function updateWorkpieceMaterials() {
+  const process =
+    document.getElementById(
+      "inp-process",
+    ).value;
+
+  const materialSelect =
+    document.getElementById(
+      "inp-workpiece-material",
+    );
+
+  if (
+    PLASTIC_PROCESSES.has(
+      process,
+    )
+  ) {
+    fillSelect(
+      "inp-workpiece-material",
+      PLASTIC_MATERIALS,
+    );
+
+    materialSelect.value =
+      "standard_thermoplastic";
+  } else {
+    fillSelect(
+      "inp-workpiece-material",
+      METAL_MATERIALS,
+    );
+
+    materialSelect.value =
+      "mild_steel";
+  }
+
+  updateThicknessField();
+}
+
+
+function updateThicknessField() {
+  const process =
+    document.getElementById(
+      "inp-process",
+    ).value;
+
+  const field =
+    document.getElementById(
+      "material-thickness-field",
+    );
+
+  const isMetal =
+    METAL_PROCESSES.has(
+      process,
+    );
+
+  field.classList.toggle(
+    "field-muted",
+    !isMetal,
+  );
+}
+
+
+/* =========================================================
+   Cycle band → suggested expected cycles
+   ========================================================= */
+
+function syncExpectedCycles() {
+  const cycleBand =
+    document.getElementById(
+      "inp-cycles",
+    ).value;
+
+  const recommendedValue =
+    CYCLE_DEFAULTS[cycleBand];
+
+  if (recommendedValue) {
+    document.getElementById(
+      "inp-expected-cycles",
+    ).value =
+      recommendedValue;
+  }
+}
+
+
+/* =========================================================
    Read calculator state
    ========================================================= */
 
 function readState() {
+  const toolingData =
+    currentToolingMaterialFamily
+      ? {
+          tooling_material_family:
+            currentToolingMaterialFamily,
+
+          tooling_material_assumptions: {
+            density_kg_m3:
+              Number.parseFloat(
+                document.getElementById(
+                  "inp-tool-density",
+                ).value,
+              ),
+
+            block_price_per_tonne:
+              Number.parseFloat(
+                document.getElementById(
+                  "inp-tool-price",
+                ).value,
+              ),
+
+            removal_rate_cm3_min:
+              Number.parseFloat(
+                document.getElementById(
+                  "inp-tool-mrr",
+                ).value,
+              ),
+
+            milling_volume_factor:
+              Number.parseFloat(
+                document.getElementById(
+                  "inp-milling-volume-factor",
+                ).value,
+              ),
+
+            milling_tool_price:
+              Number.parseFloat(
+                document.getElementById(
+                  "inp-milling-tool-price",
+                ).value,
+              ),
+
+            heat_treatment_eur_per_kg:
+              Number.parseFloat(
+                document.getElementById(
+                  "inp-heat-treatment",
+                ).value,
+              ),
+          },
+
+          manufacturing_route: {
+            cnc_3_axis_share:
+              Number.parseFloat(
+                document.getElementById(
+                  "inp-route-cnc3",
+                ).value,
+              ) / 100,
+
+            cnc_5_axis_share:
+              Number.parseFloat(
+                document.getElementById(
+                  "inp-route-cnc5",
+                ).value,
+              ) / 100,
+
+            edm_share:
+              Number.parseFloat(
+                document.getElementById(
+                  "inp-route-edm",
+                ).value,
+              ) / 100,
+
+            grinding_share:
+              Number.parseFloat(
+                document.getElementById(
+                  "inp-route-grinding",
+                ).value,
+              ) / 100,
+          },
+        }
+      : {};
+
   return {
     cycle_band:
       document.getElementById(
@@ -246,29 +679,72 @@ function readState() {
         "inp-process",
       ).value,
 
-    parts_per_mold: Number.parseInt(
+    expected_cycles:
+      Number.parseInt(
+        document.getElementById(
+          "inp-expected-cycles",
+        ).value,
+        10,
+      ),
+
+    workpiece_material:
       document.getElementById(
-        "inp-pqty",
+        "inp-workpiece-material",
       ).value,
-      10,
-    ),
+
+    material_thickness_mm:
+      Number.parseFloat(
+        document.getElementById(
+          "inp-material-thickness",
+        ).value,
+      ),
+
+    tolerance_level:
+      document.getElementById(
+        "inp-tolerance",
+      ).value,
+
+    surface_finish:
+      document.getElementById(
+        "inp-surface-finish",
+      ).value,
+
+    abrasive_material:
+      document.getElementById(
+        "inp-abrasive",
+      ).value === "true",
+
+    corrosive_environment:
+      document.getElementById(
+        "inp-corrosive",
+      ).value === "true",
+
+    parts_per_mold:
+      Number.parseInt(
+        document.getElementById(
+          "inp-pqty",
+        ).value,
+        10,
+      ),
 
     manufacturing_country:
       document.getElementById(
         "inp-country",
       ).value,
 
-    truck_distance_km: Number.parseFloat(
-      document.getElementById(
-        "inp-truck",
-      ).value,
-    ),
+    truck_distance_km:
+      Number.parseFloat(
+        document.getElementById(
+          "inp-truck",
+        ).value,
+      ),
 
-    sea_distance_km: Number.parseFloat(
-      document.getElementById(
-        "inp-sea",
-      ).value,
-    ),
+    sea_distance_km:
+      Number.parseFloat(
+        document.getElementById(
+          "inp-sea",
+        ).value,
+      ),
 
     includes_cooling:
       document.getElementById(
@@ -276,23 +752,26 @@ function readState() {
       ).value === "true",
 
     part: {
-      length_mm: Number.parseFloat(
-        document.getElementById(
-          "inp-l",
-        ).value,
-      ),
+      length_mm:
+        Number.parseFloat(
+          document.getElementById(
+            "inp-l",
+          ).value,
+        ),
 
-      width_mm: Number.parseFloat(
-        document.getElementById(
-          "inp-w",
-        ).value,
-      ),
+      width_mm:
+        Number.parseFloat(
+          document.getElementById(
+            "inp-w",
+          ).value,
+        ),
 
-      height_mm: Number.parseFloat(
-        document.getElementById(
-          "inp-h",
-        ).value,
-      ),
+      height_mm:
+        Number.parseFloat(
+          document.getElementById(
+            "inp-h",
+          ).value,
+        ),
     },
 
     assumptions: {
@@ -373,6 +852,8 @@ function readState() {
           ).value,
         ) / 100,
     },
+
+    ...toolingData,
   };
 }
 
@@ -382,6 +863,34 @@ function readState() {
    ========================================================= */
 
 function validateState(state) {
+  if (
+    !Number.isFinite(
+      state.expected_cycles,
+    ) ||
+    state.expected_cycles <= 0
+  ) {
+    throw new Error(
+      "Expected cycles must be greater than zero.",
+    );
+  }
+
+  if (!state.workpiece_material) {
+    throw new Error(
+      "Please select a workpiece material.",
+    );
+  }
+
+  if (
+    !Number.isFinite(
+      state.material_thickness_mm,
+    ) ||
+    state.material_thickness_mm <= 0
+  ) {
+    throw new Error(
+      "Material thickness must be greater than zero.",
+    );
+  }
+
   if (
     !Number.isFinite(
       state.part.length_mm,
@@ -450,8 +959,16 @@ function validateState(state) {
   }
 
 
-  const assumptions = state.assumptions;
+  /* Country cost assumptions */
 
+  const assumptions =
+    state.assumptions;
+
+  if (!assumptions) {
+    throw new Error(
+      "Manufacturing cost assumptions are missing.",
+    );
+  }
 
   const positiveFields = [
     [
@@ -484,7 +1001,6 @@ function validateState(state) {
     ],
   ];
 
-
   positiveFields.forEach(
     ([label, value]) => {
       if (
@@ -499,6 +1015,8 @@ function validateState(state) {
   );
 
 
+  /* Efficiency */
+
   if (
     !Number.isFinite(
       assumptions.machine_efficiency,
@@ -510,7 +1028,6 @@ function validateState(state) {
       "Machine efficiency must be between 1% and 100%.",
     );
   }
-
 
   if (
     !Number.isFinite(
@@ -525,6 +1042,8 @@ function validateState(state) {
   }
 
 
+  /* Commercial assumptions */
+
   if (
     !Number.isFinite(
       assumptions.overhead_rate,
@@ -537,7 +1056,6 @@ function validateState(state) {
     );
   }
 
-
   if (
     !Number.isFinite(
       assumptions.margin_rate,
@@ -549,14 +1067,149 @@ function validateState(state) {
       "Supplier margin must be between 0% and 100%.",
     );
   }
+
+
+  /* Tooling material assumptions */
+
+  if (
+    state.tooling_material_assumptions
+  ) {
+    const tooling =
+      state.tooling_material_assumptions;
+
+    if (
+      !Number.isFinite(
+        tooling.density_kg_m3,
+      ) ||
+      tooling.density_kg_m3 <= 0
+    ) {
+      throw new Error(
+        "Tooling density must be greater than zero.",
+      );
+    }
+
+    if (
+      !Number.isFinite(
+        tooling.block_price_per_tonne,
+      ) ||
+      tooling.block_price_per_tonne <= 0
+    ) {
+      throw new Error(
+        "Tooling material price must be greater than zero.",
+      );
+    }
+
+    if (
+      !Number.isFinite(
+        tooling.removal_rate_cm3_min,
+      ) ||
+      tooling.removal_rate_cm3_min <= 0
+    ) {
+      throw new Error(
+        "Removal rate must be greater than zero.",
+      );
+    }
+
+    if (
+      !Number.isFinite(
+        tooling.milling_volume_factor,
+      ) ||
+      tooling.milling_volume_factor <= 0
+    ) {
+      throw new Error(
+        "Milling volume factor must be greater than zero.",
+      );
+    }
+
+    if (
+      !Number.isFinite(
+        tooling.milling_tool_price,
+      ) ||
+      tooling.milling_tool_price < 0
+    ) {
+      throw new Error(
+        "Milling tool price cannot be negative.",
+      );
+    }
+
+    if (
+      !Number.isFinite(
+        tooling.heat_treatment_eur_per_kg,
+      ) ||
+      tooling.heat_treatment_eur_per_kg < 0
+    ) {
+      throw new Error(
+        "Heat treatment cost cannot be negative.",
+      );
+    }
+  }
+
+
+  /* Manufacturing route */
+
+  if (state.manufacturing_route) {
+    const route =
+      state.manufacturing_route;
+
+    const routeFields = [
+      [
+        "CNC 3-axis share",
+        route.cnc_3_axis_share,
+      ],
+      [
+        "CNC 5-axis share",
+        route.cnc_5_axis_share,
+      ],
+      [
+        "EDM share",
+        route.edm_share,
+      ],
+      [
+        "Grinding share",
+        route.grinding_share,
+      ],
+    ];
+
+    routeFields.forEach(
+      ([label, value]) => {
+        if (
+          !Number.isFinite(value) ||
+          value < 0 ||
+          value > 1
+        ) {
+          throw new Error(
+            `${label} must be between 0% and 100%.`,
+          );
+        }
+      },
+    );
+
+    const routeTotal =
+      route.cnc_3_axis_share +
+      route.cnc_5_axis_share +
+      route.edm_share +
+      route.grinding_share;
+
+    if (
+      Math.abs(
+        routeTotal - 1,
+      ) > 0.001
+    ) {
+      throw new Error(
+        `Manufacturing route allocation must equal 100%. Current total: ${(routeTotal * 100).toFixed(1)}%.`,
+      );
+    }
+  }
 }
 
 
 /* =========================================================
-   API calculation request
+   API
    ========================================================= */
 
-async function requestCalculation(state) {
+async function requestCalculation(
+  state,
+) {
   const response = await fetch(
     `${API_BASE_URL}/api/calculate`,
     {
@@ -567,20 +1220,18 @@ async function requestCalculation(state) {
           "application/json",
       },
 
-      body: JSON.stringify(state),
+      body:
+        JSON.stringify(state),
     },
   );
-
 
   if (!response.ok) {
     let errorMessage =
       `Calculation failed (${response.status}).`;
 
-
     try {
       const errorBody =
         await response.json();
-
 
       if (errorBody.detail) {
         errorMessage =
@@ -592,30 +1243,29 @@ async function requestCalculation(state) {
               );
       }
     } catch {
-      // Keep the default error message.
+      // Keep default error message.
     }
-
 
     throw new Error(
       errorMessage,
     );
   }
 
-
   return response.json();
 }
 
 
 /* =========================================================
-   Render result
+   Result rendering
    ========================================================= */
 
-function renderResult(result) {
+async function renderResult(
+  result,
+) {
   document.getElementById(
     "out-c12",
   ).textContent =
     result.tooling_material;
-
 
   document.getElementById(
     "out-c13",
@@ -632,7 +1282,6 @@ function renderResult(result) {
       result.gross_height_mm,
       0,
     )} mm`;
-
 
   const rows = [
     [
@@ -686,6 +1335,11 @@ function renderResult(result) {
     ],
 
     [
+      "Heat treatment cost",
+      result.heat_treatment_cost,
+    ],
+
+    [
       "Cooling system cost",
       result.cooling_cost,
     ],
@@ -706,20 +1360,16 @@ function renderResult(result) {
     ],
   ];
 
-
   const tbody =
     document.querySelector(
       "#out-main tbody",
     );
 
-
   tbody.innerHTML = rows
     .map(
       ([label, value]) => `
         <tr>
-          <th>
-            ${label}
-          </th>
+          <th>${label}</th>
 
           <td class="num">
             ${fmt(value)}
@@ -729,28 +1379,119 @@ function renderResult(result) {
     )
     .join("");
 
-
   document.getElementById(
     "out-total",
   ).textContent =
     fmt(result.total_price);
+
+  await renderRecommendation(
+    result,
+  );
 }
 
 
 /* =========================================================
-   Loading / status
+   Recommendation rendering
    ========================================================= */
 
-function setLoading(isLoading) {
+async function renderRecommendation(
+  result,
+) {
+  document.getElementById(
+    "rec-material",
+  ).textContent =
+    result.recommended_material ||
+    "—";
+
+  if (
+    result.recommended_material_family
+  ) {
+    await loadToolingMaterialDefaults(
+      result.recommended_material_family,
+    );
+  }
+
+  const confidence =
+    result.recommendation_confidence ||
+    "—";
+
+  const confidenceElement =
+    document.getElementById(
+      "rec-confidence",
+    );
+
+  confidenceElement.textContent =
+    confidence === "—"
+      ? confidence
+      : confidence
+          .charAt(0)
+          .toUpperCase() +
+        confidence.slice(1);
+
+  confidenceElement.dataset.level =
+    confidence.toLowerCase();
+
+  renderList(
+    "rec-failure-modes",
+    result.failure_modes,
+    "No major failure mode identified.",
+  );
+
+  renderList(
+    "rec-reasons",
+    result.recommendation_reasons,
+    "No recommendation reasons available.",
+  );
+
+  renderList(
+    "rec-operations",
+    result.recommended_operations,
+    "No manufacturing route available.",
+  );
+}
+
+
+function renderList(
+  id,
+  items,
+  emptyMessage,
+) {
+  const element =
+    document.getElementById(id);
+
+  if (
+    !Array.isArray(items) ||
+    items.length === 0
+  ) {
+    element.innerHTML =
+      `<li>${emptyMessage}</li>`;
+
+    return;
+  }
+
+  element.innerHTML = items
+    .map(
+      (item) =>
+        `<li>${item}</li>`,
+    )
+    .join("");
+}
+
+
+/* =========================================================
+   Status
+   ========================================================= */
+
+function setLoading(
+  isLoading,
+) {
   const button =
     document.getElementById(
       "calculate-btn",
     );
 
-
   button.disabled =
     isLoading;
-
 
   button.textContent =
     isLoading
@@ -768,10 +1509,8 @@ function setStatus(
       "calc-status",
     );
 
-
   status.textContent =
     message;
-
 
   status.classList.toggle(
     "err",
@@ -788,40 +1527,31 @@ async function calculateAndRender() {
   try {
     setLoading(true);
 
-
     setStatus(
       "Sending calculation to server...",
     );
 
-
     const state =
       readState();
-
 
     validateState(
       state,
     );
-
 
     const result =
       await requestCalculation(
         state,
       );
 
-
-    renderResult(
+    await renderResult(
       result,
     );
 
-
     setStatus(
-      "Calculation complete.",
+      "Calculation and tooling recommendation complete.",
     );
   } catch (error) {
-    console.error(
-      error,
-    );
-
+    console.error(error);
 
     setStatus(
       error.message ||
@@ -843,77 +1573,103 @@ function setupTabs() {
     .querySelectorAll(
       "nav.tabs button",
     )
-    .forEach((button) => {
-      button.addEventListener(
-        "click",
-        () => {
-          const tab =
-            button.dataset.tab;
+    .forEach(
+      (button) => {
+        button.addEventListener(
+          "click",
+          () => {
+            const tab =
+              button.dataset.tab;
 
+            document
+              .querySelectorAll(
+                "nav.tabs button",
+              )
+              .forEach(
+                (item) => {
+                  item.setAttribute(
+                    "aria-selected",
+                    item.dataset.tab ===
+                      tab,
+                  );
+                },
+              );
 
-          document
-            .querySelectorAll(
-              "nav.tabs button",
-            )
-            .forEach(
-              (item) => {
-                item.setAttribute(
-                  "aria-selected",
-                  item.dataset.tab ===
-                    tab,
-                );
-              },
-            );
-
-
-          document
-            .querySelectorAll(
-              ".panel",
-            )
-            .forEach(
-              (panel) => {
-                panel.classList.toggle(
-                  "active",
-                  panel.id ===
-                    `panel-${tab}`,
-                );
-              },
-            );
-        },
-      );
-    });
+            document
+              .querySelectorAll(
+                ".panel",
+              )
+              .forEach(
+                (panel) => {
+                  panel.classList.toggle(
+                    "active",
+                    panel.id ===
+                      `panel-${tab}`,
+                  );
+                },
+              );
+          },
+        );
+      },
+    );
 }
 
 
 /* =========================================================
-   Setup event listeners
+   Events
    ========================================================= */
 
-function setupCountryEvents() {
-  const countrySelect =
-    document.getElementById(
-      "inp-country",
+function setupEvents() {
+  document
+    .getElementById(
+      "calculate-btn",
+    )
+    .addEventListener(
+      "click",
+      calculateAndRender,
     );
 
+  document
+    .getElementById(
+      "inp-process",
+    )
+    .addEventListener(
+      "change",
+      updateWorkpieceMaterials,
+    );
 
-  countrySelect.addEventListener(
-    "change",
-    async (event) => {
-      try {
-        await loadCountryDefaults(
-          event.target.value,
-        );
-      } catch (error) {
-        console.error(error);
+  document
+    .getElementById(
+      "inp-cycles",
+    )
+    .addEventListener(
+      "change",
+      syncExpectedCycles,
+    );
 
-        setStatus(
-          error.message,
-          true,
-        );
-      }
-    },
-  );
+  document
+    .getElementById(
+      "inp-country",
+    )
+    .addEventListener(
+      "change",
+      async (event) => {
+        try {
+          await loadCountryDefaults(
+            event.target.value,
+          );
+        } catch (error) {
+          console.error(
+            error,
+          );
 
+          setStatus(
+            error.message,
+            true,
+          );
+        }
+      },
+    );
 
   document
     .getElementById(
@@ -929,9 +1685,51 @@ function setupCountryEvents() {
             currentCountryDefaults,
           );
 
-
           setStatus(
             `${currentCountryDefaults.name} benchmark assumptions restored.`,
+          );
+        }
+      },
+    );
+
+
+  /* Manufacturing route live total */
+
+  [
+    "inp-route-cnc3",
+    "inp-route-cnc5",
+    "inp-route-edm",
+    "inp-route-grinding",
+  ].forEach(
+    (id) => {
+      document
+        .getElementById(id)
+        .addEventListener(
+          "input",
+          updateRouteTotal,
+        );
+    },
+  );
+
+
+  /* Reset tooling defaults */
+
+  document
+    .getElementById(
+      "reset-tooling-defaults",
+    )
+    .addEventListener(
+      "click",
+      () => {
+        if (
+          currentToolingDefaults
+        ) {
+          applyToolingMaterialDefaults(
+            currentToolingDefaults,
+          );
+
+          setStatus(
+            `${currentToolingDefaults.name} tooling assumptions restored.`,
           );
         }
       },
@@ -945,27 +1743,20 @@ function setupCountryEvents() {
 
 async function init() {
   try {
-    /* -------------------------
-       Static dropdowns
-       ------------------------- */
-
     fillSelect(
       "inp-cycles",
       LISTS.cycles,
     );
-
 
     fillSelect(
       "inp-process",
       LISTS.processes,
     );
 
-
     fillSelect(
       "inp-pqty",
       LISTS.partsPerMold,
     );
-
 
     fillSelect(
       "inp-cooling",
@@ -973,57 +1764,77 @@ async function init() {
     );
 
 
-    /* -------------------------
-       Default calculator inputs
-       ------------------------- */
+    /* Default test case */
 
     document.getElementById(
       "inp-cycles",
     ).value =
-      "10000_to_100000";
-
+      "100000_to_250000";
 
     document.getElementById(
       "inp-process",
     ).value =
       "stamping";
 
-
     document.getElementById(
       "inp-pqty",
     ).value =
       "2";
 
+    document.getElementById(
+      "inp-expected-cycles",
+    ).value =
+      "150000";
+
+    document.getElementById(
+      "inp-material-thickness",
+    ).value =
+      "3";
+
+    document.getElementById(
+      "inp-tolerance",
+    ).value =
+      "high_precision";
+
+    document.getElementById(
+      "inp-surface-finish",
+    ).value =
+      "standard";
+
+    document.getElementById(
+      "inp-abrasive",
+    ).value =
+      "false";
+
+    document.getElementById(
+      "inp-corrosive",
+    ).value =
+      "false";
 
     document.getElementById(
       "inp-truck",
     ).value =
       "1700";
 
-
     document.getElementById(
       "inp-sea",
     ).value =
       "19800";
-
 
     document.getElementById(
       "inp-cooling",
     ).value =
       "false";
 
-
     document.getElementById(
       "inp-l",
     ).value =
       "300";
 
-
     document.getElementById(
       "inp-w",
     ).value =
       "300";
-
 
     document.getElementById(
       "inp-h",
@@ -1031,49 +1842,37 @@ async function init() {
       "40";
 
 
-    /* -------------------------
-       Load countries
-       ------------------------- */
+    /* Process-specific materials */
+
+    updateWorkpieceMaterials();
+
+    document.getElementById(
+      "inp-workpiece-material",
+    ).value =
+      "advanced_high_strength_steel";
+
+
+    /* Countries */
 
     setStatus(
       "Loading manufacturing benchmarks...",
     );
 
-
     await loadCountries();
 
-
-    const countrySelect =
-      document.getElementById(
-        "inp-country",
-      );
-
-
-    countrySelect.value =
+    document.getElementById(
+      "inp-country",
+    ).value =
       "DE";
-
 
     await loadCountryDefaults(
       "DE",
     );
 
 
-    /* -------------------------
-       Events
-       ------------------------- */
+    /* Events */
 
-    setupCountryEvents();
-
-
-    document
-      .getElementById(
-        "calculate-btn",
-      )
-      .addEventListener(
-        "click",
-        calculateAndRender,
-      );
-
+    setupEvents();
 
     setupTabs();
 
@@ -1085,7 +1884,6 @@ async function init() {
     console.error(
       error,
     );
-
 
     setStatus(
       error.message ||

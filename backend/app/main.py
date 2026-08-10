@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI, HTTPException
 
 from app.country_profiles import COUNTRY_PROFILES
+from app.tooling_materials import TOOLING_MATERIALS
 
 from app.calculator import calculate
 from app.models import CalculationRequest, CalculationResponse
@@ -76,4 +77,37 @@ def get_country_profile(country_code: str):
     return {
         "code": country_code,
         **profile,
+    }
+
+
+@app.get("/api/tooling-materials/{material_code}")
+def get_tooling_material(material_code: str):
+    profile = TOOLING_MATERIALS.get(material_code)
+
+    if profile is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Tooling material profile not found",
+        )
+
+    return {
+        "code": material_code,
+        "name": profile.name,
+
+        "density_kg_m3": profile.density_kg_m3,
+        "block_price_per_tonne": profile.block_price_per_tonne,
+        "removal_rate_cm3_min": profile.removal_rate_cm3_min,
+
+        "milling_volume_factor": profile.milling_volume_factor,
+        "milling_tool_price": profile.milling_tool_price,
+
+        "requires_heat_treatment": profile.requires_heat_treatment,
+        "heat_treatment_eur_per_kg": profile.heat_treatment_eur_per_kg,
+
+        "route": {
+            "cnc_3_axis_share": profile.route.cnc_3_axis_share,
+            "cnc_5_axis_share": profile.route.cnc_5_axis_share,
+            "edm_share": profile.route.edm_share,
+            "grinding_share": profile.route.grinding_share,
+        },
     }
