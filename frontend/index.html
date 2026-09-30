@@ -34,10 +34,7 @@
       <nav class="tabs" aria-label="Sections">
         <div class="tabs-inner">
           <button type="button" data-tab="calc" aria-selected="true">Overview</button>
-          <button type="button" data-tab="params" aria-selected="false">Reference data</button>
           <button type="button" data-tab="transport" aria-selected="false">Logistics</button>
-          <button type="button" data-tab="links" aria-selected="false">Sources</button>
-          <button type="button" data-tab="spi" aria-selected="false">SPI mold class</button>
         </div>
       </nav>
 
@@ -210,20 +207,29 @@
                     <input id="inp-truck" type="number" min="0" step="1" />
                   </div>
                   <div class="field">
-                    <label for="inp-sea">Sea distance <span class="unit">km</span></label>
-                    <input id="inp-sea" type="number" min="0" step="1" />
+                    <label for="inp-sea">Sea distance <span class="unit">nautical miles</span></label>
+                    <input id="inp-sea" type="number" min="0" step="any" />
                   </div>
                 </div>
               </section>
 
+              <section class="input-card">
+                <h3>Display currency</h3>
+                <p id="currency-note" class="field-help">European countries: EUR. Other countries: USD.</p>
+                <div class="form-grid two-col">
+                  <div class="field"><label for="inp-fx">US dollars per 1 euro</label><input id="inp-fx" type="number" min="0.000001" step="any" placeholder="Required for USD" /></div>
+                  <div class="field"><label for="inp-fx-date">Exchange rate date</label><input id="inp-fx-date" type="date" /></div>
+                </div>
+                <p class="field-help">Enter your agreed exchange rate and its date. Rates are manual and are not refreshed automatically.</p>
+              </section>
               <details class="details-card cost-assumptions">
                 <summary>
                   <span>Advanced manufacturing cost assumptions</span>
-                  <span class="summary-meta">Country defaults</span>
+                  <span id="country-defaults-flag" class="summary-meta">Country defaults</span>
                 </summary>
                 <div class="details-body">
                   <div class="inline-callout">
-                    These benchmark values are loaded from the selected country profile and remain fully editable.
+                    These benchmark values are loaded from the selected country profile and remain fully editable. Modified fields are highlighted. Engineering, electricity, overhead and supplier-margin inputs are retained for reference; the current price model does not apply them.
                   </div>
 
                   <div class="assumption-section">
@@ -252,7 +258,7 @@
                         <input id="inp-cnc5-rate" type="number" min="0.01" step="1" />
                       </div>
                       <div class="field">
-                        <label for="inp-edm-rate">EDM <span class="unit">€/h</span></label>
+                        <label for="inp-edm-rate">Electro-Discharge Machining <span class="unit">€/h</span></label>
                         <input id="inp-edm-rate" type="number" min="0.01" step="1" />
                       </div>
                       <div class="field">
@@ -318,14 +324,14 @@
                     <p class="eyebrow">Should-cost estimate</p>
                     <h2>Tooling price</h2>
                   </div>
-                  <span class="status-chip accent">Estimate</span>
+                  <span id="estimate-state" class="status-chip accent" aria-live="polite">Not calculated</span>
                 </div>
 
                 <div class="price-hero">
                   <span class="currency">€</span>
                   <strong id="out-total">—</strong>
                 </div>
-                <p class="price-caption">Estimated tooling should price</p>
+                <p class="price-caption">Estimated tooling price · <span id="result-currency">EUR</span></p>
 
                 <div class="result-summary-grid">
                   <div class="summary-tile wide">
@@ -361,6 +367,8 @@
                   <strong id="rec-confidence" class="confidence-badge">—</strong>
                 </div>
 
+                <p id="confidence-explanation" class="field-help">Calculate to see how closely your inputs match the material-selection rules.</p>
+                <p class="field-help">Confidence describes the rule match, not a measured probability or a guarantee of tool life. Selection reasons appear below.</p>
                 <div class="material-hero">
                   <span>Recommended material</span>
                   <strong id="rec-material">—</strong>
@@ -419,7 +427,7 @@
                         <input id="inp-route-cnc5" type="number" min="0" max="100" step="1" />
                       </div>
                       <div class="field">
-                        <label for="inp-route-edm">EDM <span class="unit">%</span></label>
+                        <label for="inp-route-edm">Electro-Discharge Machining <span class="unit">%</span></label>
                         <input id="inp-route-edm" type="number" min="0" max="100" step="1" />
                       </div>
                       <div class="field">
@@ -436,10 +444,11 @@
 
                 <div class="recommendation-section">
                   <div class="section-title-row">
-                    <h3>Primary failure modes</h3>
+                    <h3>Potential risks during production</h3>
                     <span class="mini-badge">Risk drivers</span>
                   </div>
-                  <ul id="rec-failure-modes" class="recommendation-list chip-list">
+                  <p class="field-help">Potential tooling risks associated with your material and production requirements. These are possible issues, not predicted failures.</p>
+                  <ul id="rec-failure-modes" class="recommendation-list risk-list">
                     <li>Calculate to generate recommendation.</li>
                   </ul>
                 </div>
@@ -452,7 +461,7 @@
                 </div>
 
                 <div class="recommendation-section route-section">
-                  <h3>Recommended manufacturing route</h3>
+                  <h3>Recommended tooling manufacturing route</h3>
                   <ol id="rec-operations" class="recommendation-list recommendation-route">
                     <li>Calculate to generate recommendation.</li>
                   </ol>
@@ -466,30 +475,6 @@
           </div>
         </section>
 
-        <section id="panel-params" class="panel" aria-labelledby="params-heading">
-          <div class="reference-shell">
-            <div class="section-intro reference-intro">
-              <div>
-                <p class="eyebrow">Reference library</p>
-                <h2 id="params-heading">Useful data</h2>
-              </div>
-            </div>
-            <div class="reference-card">
-              <p class="reference-copy">Legacy material removal rates, densities and block-price assumptions retained for comparison with the newer tooling profiles.</p>
-              <div class="table-wrap">
-                <table class="ref-table">
-                  <thead><tr><th>Grade</th><th>MRR [cm³/min]</th><th>Density [kg/m³]</th><th>Block €/t</th></tr></thead>
-                  <tbody>
-                    <tr><td>Aluminum</td><td>42.672</td><td>2710</td><td>2700</td></tr>
-                    <tr><td>Steel</td><td>3.7338</td><td>7850</td><td>800</td></tr>
-                    <tr><td>High strength steel</td><td>1.8669</td><td>7900</td><td>1400</td></tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        </section>
-
         <section id="panel-transport" class="panel" aria-labelledby="transport-heading">
           <div class="reference-shell">
             <div class="section-intro reference-intro">
@@ -499,64 +484,16 @@
               </div>
             </div>
             <div class="reference-card">
-              <div class="reference-stats">
-                <div><span>Road reference</span><strong>1,400 € / 250 km</strong></div>
-                <div><span>Road load</span><strong>18,000 kg</strong></div>
-                <div><span>Sea container</span><strong>8,000 €</strong></div>
-                <div><span>Sea load</span><strong>27,000 kg</strong></div>
+              <p class="reference-copy">Distances are entered in Overview. Freight prices below apply to one vehicle or sea load. The estimate allocates them to the tooling weight, or charges whole loads.</p>
+              <div class="form-grid two-col">
+<div class="field"><label for="road-rate">Road freight rate <span class="unit">€/vehicle-km</span></label><input id="road-rate" type="number" min="0" step="any" value="5.6" /></div><div class="field"><label for="sea-rate">Sea freight rate <span class="unit">€/load-nautical mile</span></label><input id="sea-rate" type="number" min="0" step="any" value="0.7482828282828283" /></div><div class="field"><label for="road-load">Road load capacity <span class="unit">kg</span></label><input id="road-load" type="number" min="0.001" step="any" value="18000" /></div><div class="field"><label for="sea-load">Sea load capacity <span class="unit">kg</span></label><input id="sea-load" type="number" min="0.001" step="any" value="27000" /></div><div class="field"><label for="road-journeys">Charged road journeys <span class="unit"></span></label><input id="road-journeys" type="number" min="1" step="1" value="2" /></div><div class="field"><label for="sea-journeys">Charged sea journeys <span class="unit"></span></label><input id="sea-journeys" type="number" min="1" step="1" value="2" /></div>
+              <div class="field field-span-2"><label for="freight-allocation">Freight allocation</label><select id="freight-allocation"><option value="proportional">Proportional share by weight</option><option value="whole_load">Whole loads (rounded up)</option></select></div>
               </div>
-              <div class="table-wrap">
-                <table class="ref-table">
-                  <thead><tr><th>Mode</th><th>Derived rate</th><th>Load [kg]</th></tr></thead>
-                  <tbody>
-                    <tr><td>Road</td><td>560 € / 100 km</td><td>18,000</td></tr>
-                    <tr><td>Sea</td><td>≈ 404.04 € / 1000 km</td><td>27,000</td></tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section id="panel-links" class="panel" aria-labelledby="links-heading">
-          <div class="reference-shell">
-            <div class="section-intro reference-intro">
-              <div>
-                <p class="eyebrow">Documentation</p>
-                <h2 id="links-heading">Sources &amp; links</h2>
-              </div>
-            </div>
-            <div class="reference-card">
-              <ul class="links-list">
-                <li><a href="https://www.mimatic.de/Portals/0/PDF/Zerspanung/SolidCUT/Schnittdaten_SolidCUT_2_EN.pdf" target="_blank" rel="noopener noreferrer"><span>Schnittdaten SolidCUT</span><small>Machining reference</small></a></li>
-                <li><a href="https://web.mit.edu/2.810/www/files/readings/Polgar_TimeEstimation.pdf" target="_blank" rel="noopener noreferrer"><span>Polgar — time estimation</span><small>Process-time reference</small></a></li>
-                <li><a href="https://www.cncfraises.fr/content/16-fraisage-definir-les-parametres-de-coupe" target="_blank" rel="noopener noreferrer"><span>Fraisage — paramètres de coupe</span><small>Cutting parameters</small></a></li>
-              </ul>
-            </div>
-          </div>
-        </section>
-
-        <section id="panel-spi" class="panel" aria-labelledby="spi-heading">
-          <div class="reference-shell">
-            <div class="section-intro reference-intro">
-              <div>
-                <p class="eyebrow">Mold classification</p>
-                <h2 id="spi-heading">SPI mold class</h2>
-              </div>
-            </div>
-            <div class="reference-card">
-              <div class="table-wrap">
-                <table class="ref-table">
-                  <thead><tr><th>Class</th><th>Volume</th><th>Cycles</th></tr></thead>
-                  <tbody>
-                    <tr><td>101</td><td>High</td><td>Over 1 million</td></tr>
-                    <tr><td>102</td><td>Medium-to-High</td><td>500,000 to 1 million</td></tr>
-                    <tr><td>103</td><td>Medium</td><td>Under 500,000</td></tr>
-                    <tr><td>104</td><td>Low</td><td>Less than 100,000</td></tr>
-                    <tr><td>105</td><td>Prototype</td><td>Less than 500</td></tr>
-                  </tbody>
-                </table>
-              </div>
+              <p class="field-help">Two charged journeys preserve the original estimate’s ×2 factor. Change this to match your shipment. Proportional allocation may differ from a carrier’s minimum charge.</p>
+              <button id="reset-logistics" class="secondary-btn" type="button">Restore freight defaults</button>
+              <div id="freight-breakdown" class="model-note" aria-live="polite">Calculate to see road and sea freight costs.</div>
+              <p class="field-help">Freight = distance × rate × load allocation × charged journeys. Freight amounts are shown before the estimate’s final 10% markup.</p>
+              <p id="logistics-status" class="field-help" aria-live="polite"></p>
             </div>
           </div>
         </section>

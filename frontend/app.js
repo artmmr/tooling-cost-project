@@ -252,40 +252,33 @@ async function loadCountries() {
 }
 
 
-async function loadCountryDefaults(
-  countryCode,
-) {
-  setStatus(
-    "Loading country benchmark assumptions...",
-  );
-
-  const response = await fetch(
-    `${API_BASE_URL}/api/countries/${countryCode}`,
-  );
-
-  if (!response.ok) {
-    throw new Error(
-      "Could not load country benchmark assumptions.",
-    );
+async function loadCountryDefaults(countryCode) {
+  const token = ++countryRevision;
+  countryLoading = true;
+  invalidateEstimate();
+  setStatus("Loading country benchmark assumptions…");
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/countries/${countryCode}`);
+    if (!response.ok) throw new Error("Could not load country benchmark assumptions.");
+    const profile = await response.json();
+    if (token !== countryRevision) return;
+    captureMoney();
+    currentCountryDefaults = profile;
+    displayCurrency = EUROPEAN_COUNTRIES.has(countryCode) ? "EUR" : "USD";
+    updateCurrencyDisplay();
+    applyCountryDefaults(profile);
+    countryLoading = false;
+    setStatus(currencyFactor() ? `${profile.name} defaults loaded. Prices in ${displayCurrency}.` : "Enter an exchange rate and date to calculate in USD.");
+    scheduleCalculation();
+  } catch (error) {
+    if (token !== countryRevision) return;
+    countryLoading = false;
+    currentCountryDefaults = null;
+    throw error;
   }
-
-  const profile =
-    await response.json();
-
-  currentCountryDefaults =
-    profile;
-
-  applyCountryDefaults(
-    profile,
-  );
-
-  setStatus(
-    `${profile.name} benchmark assumptions loaded.`,
-  );
 }
 
-
-function applyCountryDefaults(
+function applyCountryDefaultsRaw(
   profile,
 ) {
   document.getElementById(
@@ -349,35 +342,7 @@ function applyCountryDefaults(
    Tooling material defaults
    ========================================================= */
 
-async function loadToolingMaterialDefaults(
-  materialCode,
-) {
-  const response = await fetch(
-    `${API_BASE_URL}/api/tooling-materials/${materialCode}`,
-  );
-
-  if (!response.ok) {
-    throw new Error(
-      "Could not load tooling material defaults.",
-    );
-  }
-
-  const profile =
-    await response.json();
-
-  currentToolingDefaults =
-    profile;
-
-  currentToolingMaterialFamily =
-    materialCode;
-
-  applyToolingMaterialDefaults(
-    profile,
-  );
-}
-
-
-function applyToolingMaterialDefaults(
+function applyToolingMaterialDefaultsRaw(
   profile,
 ) {
   document.getElementById(
@@ -585,7 +550,7 @@ function syncExpectedCycles() {
    Read calculator state
    ========================================================= */
 
-function readState() {
+function readStateRaw() {
   const toolingData =
     currentToolingMaterialFamily
       ? {
@@ -739,7 +704,7 @@ function readState() {
         ).value,
       ),
 
-    sea_distance_km:
+    sea_distance_nm:
       Number.parseFloat(
         document.getElementById(
           "inp-sea",
@@ -937,9 +902,9 @@ function validateState(state) {
 
   if (
     !Number.isFinite(
-      state.sea_distance_km,
+      state.sea_distance_nm,
     ) ||
-    state.sea_distance_km < 0
+    state.sea_distance_nm < 0
   ) {
     throw new Error(
       "Sea distance cannot be negative.",
@@ -988,7 +953,7 @@ function validateState(state) {
       assumptions.cnc_5_axis_rate,
     ],
     [
-      "EDM rate",
+      "Electro-Discharge Machining rate",
       assumptions.edm_rate,
     ],
     [
@@ -1161,7 +1126,7 @@ function validateState(state) {
         route.cnc_5_axis_share,
       ],
       [
-        "EDM share",
+        "Electro-Discharge Machining share",
         route.edm_share,
       ],
       [
@@ -1208,12 +1173,13 @@ function validateState(state) {
    ========================================================= */
 
 async function requestCalculation(
-  state,
+  state, signal,
 ) {
   const response = await fetch(
     `${API_BASE_URL}/api/calculate`,
     {
       method: "POST",
+      signal,
 
       headers: {
         "Content-Type":
@@ -1367,12 +1333,12 @@ async function renderResult(
 
   tbody.innerHTML = rows
     .map(
-      ([label, value]) => `
+      ([label, value], index) => `
         <tr>
           <th>${label}</th>
 
           <td class="num">
-            ${fmt(value)}
+            ${index >= 5 ? money(value) : fmt(value)}
           </td>
         </tr>
       `,
@@ -1382,7 +1348,7 @@ async function renderResult(
   document.getElementById(
     "out-total",
   ).textContent =
-    fmt(result.total_price);
+    fmt(result.total_price * currencyFactor());
 
   await renderRecommendation(
     result,
@@ -1394,93 +1360,45 @@ async function renderResult(
    Recommendation rendering
    ========================================================= */
 
-async function renderRecommendation(
-  result,
-) {
-  document.getElementById(
-    "rec-material",
-  ).textContent =
-    result.recommended_material ||
-    "—";
-
-  if (
-    result.recommended_material_family
-  ) {
-    await loadToolingMaterialDefaults(
-      result.recommended_material_family,
-    );
+async function renderRecommendation(result) {
+  document.getElementById("rec-material").textContent = result.recommended_material || "—";
+  const confidence = result.recommendation_confidence || "unknown";
+  const badge = document.getElementById("rec-confidence");
+  badge.textContent = `Confidence: ${sentenceCase(confidence)}`;
+  badge.dataset.level = confidence;
+  document.getElementById("confidence-explanation").textContent =
+    (confidence === "high"
+      ? "Your inputs trigger a specific selection rule for material durability, loading, corrosion, precision or finish. "
+      : "This is a general recommendation for the selected production conditions. Exact grade and geometry may change the choice. ")
+    + (result.recommendation_reasons || []).map(sentenceCase).join(" ");
+  const risks = document.getElementById("rec-failure-modes");
+  risks.replaceChildren();
+  const modes = result.failure_modes || [];
+  if (!modes.length) {
+    const li = document.createElement("li");
+    li.textContent = "No specific elevated risk was identified by these rules. This does not mean production is risk-free.";
+    risks.append(li);
   }
-
-  const confidence =
-    result.recommendation_confidence ||
-    "—";
-
-  const confidenceElement =
-    document.getElementById(
-      "rec-confidence",
-    );
-
-  confidenceElement.textContent =
-    confidence === "—"
-      ? confidence
-      : confidence
-          .charAt(0)
-          .toUpperCase() +
-        confidence.slice(1);
-
-  confidenceElement.dataset.level =
-    confidence.toLowerCase();
-
-  renderList(
-    "rec-failure-modes",
-    result.failure_modes,
-    "No major failure mode identified.",
-  );
-
-  renderList(
-    "rec-reasons",
-    result.recommendation_reasons,
-    "No recommendation reasons available.",
-  );
-
-  renderList(
-    "rec-operations",
-    result.recommended_operations,
-    "No manufacturing route available.",
-  );
+  modes.forEach(mode => {
+    const li = document.createElement("li");
+    const strong = document.createElement("strong");
+    strong.textContent = `${sentenceCase(mode)}: `;
+    li.append(strong, document.createTextNode(RISK_HELP[mode] || "Review this risk against your tooling design and production conditions."));
+    risks.append(li);
+  });
+  renderList("rec-reasons", result.recommendation_reasons, "No selection reasons available.");
+  renderList("rec-operations", result.recommended_operations, "No tooling manufacturing route available.");
 }
 
-
-function renderList(
-  id,
-  items,
-  emptyMessage,
-) {
-  const element =
-    document.getElementById(id);
-
-  if (
-    !Array.isArray(items) ||
-    items.length === 0
-  ) {
-    element.innerHTML =
-      `<li>${emptyMessage}</li>`;
-
-    return;
-  }
-
-  element.innerHTML = items
-    .map(
-      (item) =>
-        `<li>${item}</li>`,
-    )
-    .join("");
+function renderList(id, items, emptyMessage) {
+  const element = document.getElementById(id);
+  element.replaceChildren();
+  (items?.length ? items : [emptyMessage]).forEach(item => {
+    const li = document.createElement("li");
+    li.textContent = sentenceCase(item);
+    element.append(li);
+  });
 }
-
-
-/* =========================================================
-   Status
-   ========================================================= */
 
 function setLoading(
   isLoading,
@@ -1511,6 +1429,7 @@ function setStatus(
 
   status.textContent =
     message;
+  document.getElementById("logistics-status").textContent = message;
 
   status.classList.toggle(
     "err",
@@ -1524,49 +1443,57 @@ function setStatus(
    ========================================================= */
 
 async function calculateAndRender() {
+  clearTimeout(calculationTimer);
+  const revision = ++inputRevision;
+  activeCalculation?.abort();
+  const controller = new AbortController();
+  activeCalculation = controller;
   try {
+    if (countryLoading) throw new Error("Wait for country defaults to finish loading.");
+    if (!currentCountryDefaults || currentCountryDefaults.code !== document.getElementById("inp-country").value)
+      throw new Error("Country defaults are unavailable. Select the country again.");
+    if (!currencyFactor()) throw new Error("Enter a positive EUR/USD exchange rate and its date before calculating in USD.");
+    const state = readState();
+    validateState(state);
+    validateLogistics(state.logistics);
     setLoading(true);
-
-    setStatus(
-      "Sending calculation to server...",
-    );
-
-    const state =
-      readState();
-
-    validateState(
-      state,
-    );
-
-    const result =
-      await requestCalculation(
-        state,
-      );
-
-    await renderResult(
-      result,
-    );
-
-    setStatus(
-      "Calculation and tooling recommendation complete.",
-    );
+    markStale("Updating estimate…");
+    setStatus("Updating estimate…");
+    const result = await requestCalculation(state, controller.signal);
+    if (revision !== inputRevision) return;
+    const familyChanged = currentToolingMaterialFamily !== result.recommended_material_family;
+    const hadFamily = Boolean(currentToolingMaterialFamily);
+    let profile;
+    if (familyChanged) {
+      const response = await fetch(`${API_BASE_URL}/api/tooling-materials/${result.recommended_material_family}`, {signal: controller.signal});
+      if (!response.ok) throw new Error("Could not load the recommended tooling defaults.");
+      profile = await response.json();
+    }
+    if (revision !== inputRevision) return;
+    if (profile) {
+      currentToolingDefaults = profile;
+      currentToolingMaterialFamily = result.recommended_material_family;
+      applyToolingMaterialDefaults(profile);
+    }
+    await renderResult(result);
+    if (revision !== inputRevision) return;
+    hasCalculated = true;
+    const badge = document.getElementById("estimate-state");
+    badge.textContent = "Up to date";
+    badge.dataset.stale = "false";
+    document.getElementById("freight-breakdown").textContent =
+      `Road freight: ${money(result.road_transport_cost)} · Sea freight: ${money(result.sea_transport_cost)} · Total freight: ${money(result.transport_cost)}`;
+    setStatus(familyChanged && hadFamily
+      ? "Recommended material changed. Tooling defaults have been updated."
+      : "Estimate updated. Further edits recalculate automatically.");
   } catch (error) {
-    console.error(error);
-
-    setStatus(
-      error.message ||
-        "Unable to calculate tooling cost.",
-      true,
-    );
+    if (revision !== inputRevision || error.name === "AbortError") return;
+    markStale(hasCalculated ? "Estimate out of date" : "Not calculated");
+    setStatus(error.message || "Unable to calculate tooling cost.", true);
   } finally {
-    setLoading(false);
+    if (revision === inputRevision) setLoading(false);
   }
 }
-
-
-/* =========================================================
-   Tabs
-   ========================================================= */
 
 function setupTabs() {
   document
@@ -1620,126 +1547,45 @@ function setupTabs() {
    ========================================================= */
 
 function setupEvents() {
-  document
-    .getElementById(
-      "calculate-btn",
-    )
-    .addEventListener(
-      "click",
-      calculateAndRender,
-    );
-
-  document
-    .getElementById(
-      "inp-process",
-    )
-    .addEventListener(
-      "change",
-      updateWorkpieceMaterials,
-    );
-
-  document
-    .getElementById(
-      "inp-cycles",
-    )
-    .addEventListener(
-      "change",
-      syncExpectedCycles,
-    );
-
-  document
-    .getElementById(
-      "inp-country",
-    )
-    .addEventListener(
-      "change",
-      async (event) => {
-        try {
-          await loadCountryDefaults(
-            event.target.value,
-          );
-        } catch (error) {
-          console.error(
-            error,
-          );
-
-          setStatus(
-            error.message,
-            true,
-          );
-        }
-      },
-    );
-
-  document
-    .getElementById(
-      "reset-country-defaults",
-    )
-    .addEventListener(
-      "click",
-      () => {
-        if (
-          currentCountryDefaults
-        ) {
-          applyCountryDefaults(
-            currentCountryDefaults,
-          );
-
-          setStatus(
-            `${currentCountryDefaults.name} benchmark assumptions restored.`,
-          );
-        }
-      },
-    );
-
-
-  /* Manufacturing route live total */
-
-  [
-    "inp-route-cnc3",
-    "inp-route-cnc5",
-    "inp-route-edm",
-    "inp-route-grinding",
-  ].forEach(
-    (id) => {
-      document
-        .getElementById(id)
-        .addEventListener(
-          "input",
-          updateRouteTotal,
-        );
-    },
-  );
-
-
-  /* Reset tooling defaults */
-
-  document
-    .getElementById(
-      "reset-tooling-defaults",
-    )
-    .addEventListener(
-      "click",
-      () => {
-        if (
-          currentToolingDefaults
-        ) {
-          applyToolingMaterialDefaults(
-            currentToolingDefaults,
-          );
-
-          setStatus(
-            `${currentToolingDefaults.name} tooling assumptions restored.`,
-          );
-        }
-      },
-    );
+  document.getElementById("calculate-btn").addEventListener("click", calculateAndRender);
+  document.getElementById("inp-process").addEventListener("change", updateWorkpieceMaterials);
+  document.getElementById("inp-cycles").addEventListener("change", syncExpectedCycles);
+  document.getElementById("inp-country").addEventListener("change", async event => {
+    try { await loadCountryDefaults(event.target.value); }
+    catch (error) { setStatus(error.message, true); }
+  });
+  document.getElementById("reset-country-defaults").addEventListener("click", () => {
+    if (currentCountryDefaults) {
+      applyCountryDefaults(currentCountryDefaults);
+      scheduleCalculation();
+    }
+  });
+  document.getElementById("reset-tooling-defaults").addEventListener("click", () => {
+    if (currentToolingDefaults) {
+      applyToolingMaterialDefaults(currentToolingDefaults);
+      scheduleCalculation();
+    }
+  });
+  document.getElementById("reset-logistics").addEventListener("click", () => {
+    restoreLogistics();
+    scheduleCalculation();
+  });
+  document.querySelectorAll("input, select").forEach(element => {
+    const eventName = element.tagName === "SELECT" ? "change" : "input";
+    element.addEventListener(eventName, () => {
+      if (element.id === "inp-country") return;
+      if (element.id === "inp-fx" || element.id === "inp-fx-date") {
+        captureMoney();
+        updateCurrencyDisplay();
+      } else if (MONEY_FIELDS.includes(element.id) && shownFactor) {
+        canonicalMoney[element.id] = Number(element.value) / shownFactor;
+      }
+      updateCountryFlags();
+      updateRouteTotal();
+      scheduleCalculation();
+    });
+  });
 }
-
-
-/* =========================================================
-   Initialization
-   ========================================================= */
 
 async function init() {
   try {
@@ -1819,7 +1665,7 @@ async function init() {
     document.getElementById(
       "inp-sea",
     ).value =
-      "19800";
+      String(19800 / 1.852);
 
     document.getElementById(
       "inp-cooling",
@@ -1897,6 +1743,168 @@ async function init() {
 /* =========================================================
    Start
    ========================================================= */
+
+// The API's monetary contract remains EUR. Currency conversion is an explicit view layer.
+const EUROPEAN_COUNTRIES = new Set(["DE", "FR", "AT", "CZ", "SK", "HU", "PL", "ES", "IT"]);
+const COUNTRY_FIELDS = {
+  "inp-engineering-rate": "engineering_rate", "inp-assembly-rate": "assembly_rate",
+  "inp-cnc3-rate": "cnc_3_axis_rate", "inp-cnc5-rate": "cnc_5_axis_rate",
+  "inp-edm-rate": "edm_rate", "inp-grinding-rate": "grinding_rate",
+  "inp-electricity": "electricity_eur_kwh", "inp-machine-efficiency": "machine_efficiency",
+  "inp-operator-efficiency": "operator_efficiency", "inp-overhead-rate": "overhead_rate",
+  "inp-margin-rate": "margin_rate"
+};
+const PERCENT_FIELDS = new Set(["inp-machine-efficiency", "inp-operator-efficiency", "inp-overhead-rate", "inp-margin-rate"]);
+const MONEY_FIELDS = [...Object.keys(COUNTRY_FIELDS).filter(id => !PERCENT_FIELDS.has(id)),
+  "inp-tool-price", "inp-milling-tool-price", "inp-heat-treatment", "road-rate", "sea-rate"];
+const canonicalMoney = {"road-rate": 1400 / 250, "sea-rate": 8000 / 19800 * 1.852};
+let displayCurrency = "EUR", shownFactor = 1;
+let hasCalculated = false, calculationTimer, inputRevision = 0, activeCalculation;
+let countryRevision = 0, countryLoading = false;
+const RISK_HELP = {
+  "abrasive wear": "Abrasive material can wear tool surfaces and gradually affect part dimensions.",
+  "corrosion": "Chemical attack can damage the tooling surface and affect part quality.",
+  "surface degradation": "Tool surfaces can deteriorate, reducing the finish quality of produced parts.",
+  "long-term wear": "Repeated production cycles can wear the tool and increase maintenance needs.",
+  "dimensional drift": "Wear or deformation can gradually move parts outside their required tolerances.",
+  "galling": "Workpiece material can stick to the tool, causing scratches or poor surface finish.",
+  "chipping": "Small pieces can break away from tool edges under load.",
+  "cracking": "Repeated or severe loads can cause cracks in the tool.",
+  "plastic deformation": "High contact loads can permanently change the tool's shape.",
+  "high mechanical loading": "High forces increase stress on punches, dies and forming surfaces."
+};
+function sentenceCase(text) {
+  const expanded = String(text).replace(/\bEDM\b/g, "Electro-Discharge Machining");
+  return expanded.charAt(0).toUpperCase() + expanded.slice(1);
+}
+function currencyFactor() {
+  if (displayCurrency === "EUR") return 1;
+  const rate = Number(document.getElementById("inp-fx").value);
+  return Number.isFinite(rate) && rate > 0 && document.getElementById("inp-fx-date").value ? rate : null;
+}
+function money(euros) {
+  const factor = currencyFactor();
+  return factor && Number.isFinite(euros) ? `${displayCurrency} ${fmt(euros * factor)}` : "—";
+}
+function captureMoney() {
+  if (!shownFactor) return;
+  MONEY_FIELDS.forEach(id => {
+    const field = document.getElementById(id);
+    if (field.value !== "") canonicalMoney[id] = Number(field.value) / shownFactor;
+  });
+}
+function showMoneyFields(ids = MONEY_FIELDS) {
+  ids.forEach(id => {
+    const field = document.getElementById(id);
+    field.disabled = !shownFactor;
+    const base = canonicalMoney[id];
+    field.value = shownFactor && Number.isFinite(base) ? Number((base * shownFactor).toPrecision(12)) : "";
+  });
+}
+function updateCurrencyDisplay() {
+  shownFactor = currencyFactor();
+  showMoneyFields();
+  document.querySelectorAll(".unit").forEach(label => {
+    if (!label.dataset.eurLabel && label.textContent.includes("€")) label.dataset.eurLabel = label.textContent;
+    if (label.dataset.eurLabel) label.textContent = label.dataset.eurLabel.replace("€", displayCurrency);
+  });
+  document.querySelector(".price-hero .currency").textContent = displayCurrency === "EUR" ? "€" : "$";
+  document.getElementById("result-currency").textContent = displayCurrency;
+  document.getElementById("currency-note").textContent = displayCurrency === "EUR"
+    ? "Prices are displayed in EUR for this European manufacturing country."
+    : shownFactor ? `Prices are displayed in USD. 1 EUR = ${shownFactor} USD, rate dated ${document.getElementById("inp-fx-date").value}.`
+      : "Prices will be displayed in USD. Enter an exchange rate and date to continue.";
+  // Never relabel an old numeric result as a different currency.
+  document.getElementById("out-total").textContent = "—";
+  document.querySelector("#out-main tbody").replaceChildren();
+  document.getElementById("freight-breakdown").textContent = "Recalculate to see freight in the selected currency.";
+  updateCountryFlags();
+}
+function applyCountryDefaults(profile) {
+  applyCountryDefaultsRaw(profile);
+  Object.entries(COUNTRY_FIELDS).forEach(([id, key]) => {
+    if (!PERCENT_FIELDS.has(id)) canonicalMoney[id] = profile[key];
+  });
+  showMoneyFields(Object.keys(COUNTRY_FIELDS).filter(id => !PERCENT_FIELDS.has(id)));
+  updateCountryFlags();
+}
+function applyToolingMaterialDefaults(profile) {
+  applyToolingMaterialDefaultsRaw(profile);
+  canonicalMoney["inp-tool-price"] = profile.block_price_per_tonne;
+  canonicalMoney["inp-milling-tool-price"] = profile.milling_tool_price;
+  canonicalMoney["inp-heat-treatment"] = profile.heat_treatment_eur_per_kg;
+  showMoneyFields(["inp-tool-price", "inp-milling-tool-price", "inp-heat-treatment"]);
+}
+function updateCountryFlags() {
+  if (!currentCountryDefaults) return;
+  let count = 0;
+  Object.entries(COUNTRY_FIELDS).forEach(([id, key]) => {
+    const field = document.getElementById(id);
+    const value = PERCENT_FIELDS.has(id) ? Number(field.value) / 100 : canonicalMoney[id];
+    const modified = !Number.isFinite(value) || Math.abs(value - currentCountryDefaults[key]) > 1e-8;
+    field.classList.toggle("modified", modified);
+    const base = currentCountryDefaults[key];
+    field.title = `Country default: ${PERCENT_FIELDS.has(id) ? fmt(base * 100) + "%" : money(base)}${modified ? " (modified)" : ""}`;
+    if (modified) count++;
+  });
+  const flag = document.getElementById("country-defaults-flag");
+  flag.textContent = count ? `Country defaults modified (${count})` : "Country defaults";
+  flag.classList.toggle("modified", count > 0);
+}
+function readState() {
+  const state = readStateRaw();
+  const factor = currencyFactor();
+  ["engineering_rate", "assembly_rate", "cnc_3_axis_rate", "cnc_5_axis_rate", "edm_rate", "grinding_rate", "electricity_eur_kwh"].forEach(key => state.assumptions[key] /= factor);
+  if (state.tooling_material_assumptions) {
+    ["block_price_per_tonne", "milling_tool_price", "heat_treatment_eur_per_kg"].forEach(key => state.tooling_material_assumptions[key] /= factor);
+  }
+  const number = id => Number.parseFloat(document.getElementById(id).value);
+  state.logistics = {
+    road_rate_eur_per_km: number("road-rate") / factor,
+    sea_rate_eur_per_nm: number("sea-rate") / factor,
+    road_load_kg: number("road-load"), sea_load_kg: number("sea-load"),
+    road_journeys: number("road-journeys"), sea_journeys: number("sea-journeys"),
+    allocation: document.getElementById("freight-allocation").value
+  };
+  return state;
+}
+function validateLogistics(logistics) {
+  for (const [key, value] of Object.entries(logistics)) {
+    if (key === "allocation") continue;
+    const min = key.includes("rate") ? 0 : Number.EPSILON;
+    if (!Number.isFinite(value) || value < min) throw new Error("Freight rates must be non-negative and load capacities must be positive.");
+    if (key.includes("journeys") && (!Number.isInteger(value) || value < 1 || value > 100)) throw new Error("Charged journeys must be whole numbers from 1 to 100.");
+  }
+}
+function restoreLogistics() {
+  canonicalMoney["road-rate"] = 1400 / 250;
+  canonicalMoney["sea-rate"] = 8000 / 19800 * 1.852;
+  showMoneyFields(["road-rate", "sea-rate"]);
+  document.getElementById("road-load").value = 18000;
+  document.getElementById("sea-load").value = 27000;
+  document.getElementById("road-journeys").value = 2;
+  document.getElementById("sea-journeys").value = 2;
+  document.getElementById("freight-allocation").value = "proportional";
+}
+function markStale(message = "Estimate out of date") {
+  const badge = document.getElementById("estimate-state");
+  badge.textContent = message;
+  badge.dataset.stale = "true";
+}
+function invalidateEstimate() {
+  ++inputRevision;
+  activeCalculation?.abort();
+  clearTimeout(calculationTimer);
+  setLoading(false);
+  if (hasCalculated) markStale();
+}
+function scheduleCalculation() {
+  invalidateEstimate();
+  if (!hasCalculated || countryLoading) return;
+  setStatus("Inputs changed. Updating estimate shortly…");
+  calculationTimer = setTimeout(calculateAndRender, 600);
+}
+
 
 document.addEventListener(
   "DOMContentLoaded",
