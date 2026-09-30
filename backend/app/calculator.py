@@ -13,6 +13,8 @@ from app.tooling_materials import (
     TOOLING_MATERIALS,
 )
 
+from app.country_profiles import COUNTRY_PROFILES
+
 from app.models import (
     CalculationRequest,
     CalculationResponse,
@@ -640,32 +642,48 @@ def calculate(
 
 
     # ---------------------------------------------------------
-    # 22. Transport
+    # 22. Transport & Logistics
     # ---------------------------------------------------------
 
+    if request.logistics is not None:
+        truck_distance_km = request.logistics.truck_distance_km
+        road_cost_per_100_km = request.logistics.road_cost_per_100_km
+        road_load_kg = request.logistics.road_load_kg
+
+        sea_distance_nm = request.logistics.sea_distance_nm
+        sea_container_cost = request.logistics.sea_container_cost
+        sea_reference_distance_nm = request.logistics.sea_reference_distance_nm
+        sea_load_kg = request.logistics.sea_load_kg
+    else:
+        truck_distance_km = request.truck_distance_km
+        road_cost_per_100_km = ROAD_COST_PER_100_KM
+        road_load_kg = ROAD_LOAD_KG
+
+        sea_distance_nm = request.sea_distance_nm
+        sea_container_cost = 8000.0
+        sea_reference_distance_nm = 10700.0
+        sea_load_kg = SEA_LOAD_KG
+
     road_transport_cost = (
-        request.truck_distance_km
+        truck_distance_km
         / 100
-        * ROAD_COST_PER_100_KM
+        * road_cost_per_100_km
         * (
             tooling_weight_kg
-            / ROAD_LOAD_KG
+            / road_load_kg
         )
         * 2
     )
-
 
     sea_transport_cost = (
-        request.sea_distance_km
-        / 1000
-        * SEA_COST_PER_1000_KM
+        (sea_distance_nm / sea_reference_distance_nm)
+        * sea_container_cost
         * (
             tooling_weight_kg
-            / SEA_LOAD_KG
+            / sea_load_kg
         )
         * 2
     )
-
 
     transport_cost = (
         road_transport_cost
@@ -684,7 +702,6 @@ def calculate(
         + transport_cost
     )
 
-
     total_price = (
         total_before_final_markup
         * 1.1
@@ -692,7 +709,19 @@ def calculate(
 
 
     # ---------------------------------------------------------
-    # 24. API response
+    # 24. Currency determination
+    # ---------------------------------------------------------
+
+    country_profile = COUNTRY_PROFILES.get(
+        request.manufacturing_country.upper(),
+        {},
+    )
+    currency = country_profile.get("currency", "EUR")
+    currency_symbol = country_profile.get("currency_symbol", "€")
+
+
+    # ---------------------------------------------------------
+    # 25. API response
     # ---------------------------------------------------------
 
     return CalculationResponse(
@@ -772,8 +801,24 @@ def calculate(
             transport_cost
         ),
 
+        road_transport_cost=(
+            road_transport_cost
+        ),
+
+        sea_transport_cost=(
+            sea_transport_cost
+        ),
+
         total_price=(
             total_price
+        ),
+
+        currency=(
+            currency
+        ),
+
+        currency_symbol=(
+            currency_symbol
         ),
 
         recommended_material=(
@@ -786,6 +831,10 @@ def calculate(
 
         recommendation_confidence=(
             recommendation.confidence
+        ),
+
+        confidence_explanation=(
+            recommendation.confidence_explanation
         ),
 
         failure_modes=(

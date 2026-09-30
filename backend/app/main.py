@@ -7,6 +7,7 @@ from app.tooling_materials import TOOLING_MATERIALS
 
 from app.calculator import calculate
 from app.models import CalculationRequest, CalculationResponse
+from app.reference_data import load_reference_summary
 
 
 app = FastAPI(
@@ -57,9 +58,16 @@ def get_countries():
         {
             "code": code,
             "name": profile["name"],
+            "currency": profile.get("currency", "EUR"),
+            "currency_symbol": profile.get("currency_symbol", "€"),
         }
         for code, profile in COUNTRY_PROFILES.items()
     ]
+
+
+@app.get("/api/reference-data")
+def get_reference_data():
+    return load_reference_summary()
 
 
 @app.get("/api/countries/{country_code}")
