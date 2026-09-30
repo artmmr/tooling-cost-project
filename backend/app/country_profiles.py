@@ -1,8 +1,6 @@
 COUNTRY_PROFILES = {
     "DE": {
         "name": "Germany",
-        "currency": "EUR",
-        "currency_symbol": "€",
         "engineering_rate": 80.0,
         "assembly_rate": 45.0,
         "cnc_3_axis_rate": 110.0,
@@ -18,8 +16,6 @@ COUNTRY_PROFILES = {
 
     "FR": {
         "name": "France",
-        "currency": "EUR",
-        "currency_symbol": "€",
         "engineering_rate": 75.0,
         "assembly_rate": 43.0,
         "cnc_3_axis_rate": 105.0,
@@ -35,8 +31,6 @@ COUNTRY_PROFILES = {
 
     "AT": {
         "name": "Austria",
-        "currency": "EUR",
-        "currency_symbol": "€",
         "engineering_rate": 85.0,
         "assembly_rate": 47.0,
         "cnc_3_axis_rate": 110.0,
@@ -52,8 +46,6 @@ COUNTRY_PROFILES = {
 
     "CZ": {
         "name": "Czech Republic",
-        "currency": "EUR",
-        "currency_symbol": "€",
         "engineering_rate": 35.0,
         "assembly_rate": 19.0,
         "cnc_3_axis_rate": 80.0,
@@ -69,8 +61,6 @@ COUNTRY_PROFILES = {
 
     "SK": {
         "name": "Slovakia",
-        "currency": "EUR",
-        "currency_symbol": "€",
         "engineering_rate": 30.0,
         "assembly_rate": 18.0,
         "cnc_3_axis_rate": 80.0,
@@ -86,8 +76,6 @@ COUNTRY_PROFILES = {
 
     "HU": {
         "name": "Hungary",
-        "currency": "EUR",
-        "currency_symbol": "€",
         "engineering_rate": 25.0,
         "assembly_rate": 14.0,
         "cnc_3_axis_rate": 75.0,
@@ -103,8 +91,6 @@ COUNTRY_PROFILES = {
 
     "PL": {
         "name": "Poland",
-        "currency": "EUR",
-        "currency_symbol": "€",
         "engineering_rate": 30.0,
         "assembly_rate": 16.0,
         "cnc_3_axis_rate": 75.0,
@@ -120,8 +106,6 @@ COUNTRY_PROFILES = {
 
     "ES": {
         "name": "Spain",
-        "currency": "EUR",
-        "currency_symbol": "€",
         "engineering_rate": 45.0,
         "assembly_rate": 26.0,
         "cnc_3_axis_rate": 85.0,
@@ -137,8 +121,6 @@ COUNTRY_PROFILES = {
 
     "IT": {
         "name": "Italy",
-        "currency": "EUR",
-        "currency_symbol": "€",
         "engineering_rate": 55.0,
         "assembly_rate": 30.0,
         "cnc_3_axis_rate": 90.0,
@@ -154,8 +136,6 @@ COUNTRY_PROFILES = {
 
     "CN": {
         "name": "China",
-        "currency": "USD",
-        "currency_symbol": "$",
         "engineering_rate": 25.0,
         "assembly_rate": 10.0,
         "cnc_3_axis_rate": 65.0,
@@ -171,8 +151,6 @@ COUNTRY_PROFILES = {
 
     "IN": {
         "name": "India",
-        "currency": "USD",
-        "currency_symbol": "$",
         "engineering_rate": 15.0,
         "assembly_rate": 5.0,
         "cnc_3_axis_rate": 60.0,

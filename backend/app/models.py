@@ -1,7 +1,7 @@
-from __future__ import annotations
-
 from enum import Enum
-from pydantic import BaseModel, Field, model_validator
+from typing import Literal
+
+from pydantic import BaseModel, Field
 
 
 # =========================================================
@@ -32,20 +32,42 @@ class ProcessType(str, Enum):
 
 class WorkpieceMaterial(str, Enum):
     # Plastic materials
-    STANDARD_THERMOPLASTIC = "standard_thermoplastic"
-    GLASS_FILLED_THERMOPLASTIC = "glass_filled_thermoplastic"
-    MINERAL_FILLED_THERMOPLASTIC = "mineral_filled_thermoplastic"
-    CORROSIVE_POLYMER = "corrosive_polymer"
+    STANDARD_THERMOPLASTIC = (
+        "standard_thermoplastic"
+    )
+
+    GLASS_FILLED_THERMOPLASTIC = (
+        "glass_filled_thermoplastic"
+    )
+
+    MINERAL_FILLED_THERMOPLASTIC = (
+        "mineral_filled_thermoplastic"
+    )
+
+    CORROSIVE_POLYMER = (
+        "corrosive_polymer"
+    )
+
     THERMOSET = "thermoset"
     ELASTOMER = "elastomer"
 
     # Metal materials
     MILD_STEEL = "mild_steel"
-    HIGH_STRENGTH_STEEL = "high_strength_steel"
-    ADVANCED_HIGH_STRENGTH_STEEL = "advanced_high_strength_steel"
+
+    HIGH_STRENGTH_STEEL = (
+        "high_strength_steel"
+    )
+
+    ADVANCED_HIGH_STRENGTH_STEEL = (
+        "advanced_high_strength_steel"
+    )
+
     STAINLESS_STEEL = "stainless_steel"
+
     ALUMINUM_SHEET = "aluminum_sheet"
+
     COPPER_BRASS = "copper_brass"
+
     OTHER = "other"
 
 
@@ -87,23 +109,42 @@ class CostAssumptions(BaseModel):
 
     electricity_eur_kwh: float = Field(gt=0)
 
-    machine_efficiency: float = Field(gt=0, le=1)
-    operator_efficiency: float = Field(gt=0, le=1)
+    machine_efficiency: float = Field(
+        gt=0,
+        le=1,
+    )
 
-    overhead_rate: float = Field(ge=0, le=1)
-    margin_rate: float = Field(ge=0, le=1)
+    operator_efficiency: float = Field(
+        gt=0,
+        le=1,
+    )
+
+    overhead_rate: float = Field(
+        ge=0,
+        le=1,
+    )
+
+    margin_rate: float = Field(
+        ge=0,
+        le=1,
+    )
 
 
 # =========================================================
-# Tooling material & route assumptions
+# API request
 # =========================================================
 
 class ToolingMaterialAssumptions(BaseModel):
     density_kg_m3: float = Field(gt=0)
+
     block_price_per_tonne: float = Field(gt=0)
+
     removal_rate_cm3_min: float = Field(gt=0)
+
     milling_volume_factor: float = Field(gt=0)
+
     milling_tool_price: float = Field(ge=0)
+
     heat_treatment_eur_per_kg: float = Field(ge=0)
 
 
@@ -113,25 +154,16 @@ class ManufacturingRouteAssumptions(BaseModel):
     edm_share: float = Field(ge=0, le=1)
     grinding_share: float = Field(ge=0, le=1)
 
-
-# =========================================================
-# Logistics assumptions
-# =========================================================
-
 class LogisticsAssumptions(BaseModel):
-    truck_distance_km: float = Field(default=1700.0, ge=0)
-    road_cost_per_100_km: float = Field(default=560.0, ge=0)
-    road_load_kg: float = Field(default=18000.0, gt=0)
+    # Rates are always EUR at the API boundary. Defaults preserve legacy costs.
+    road_rate_eur_per_km: float = Field(default=1400 / 250, ge=0, allow_inf_nan=False)
+    sea_rate_eur_per_nm: float = Field(default=8000 / 19800 * 1.852, ge=0, allow_inf_nan=False)
+    road_load_kg: float = Field(default=18000, gt=0, allow_inf_nan=False)
+    sea_load_kg: float = Field(default=27000, gt=0, allow_inf_nan=False)
+    road_journeys: int = Field(default=2, ge=1, le=100)
+    sea_journeys: int = Field(default=2, ge=1, le=100)
+    allocation: Literal["proportional", "whole_load"] = "proportional"
 
-    sea_distance_nm: float = Field(default=10700.0, ge=0)
-    sea_container_cost: float = Field(default=8000.0, ge=0)
-    sea_reference_distance_nm: float = Field(default=10700.0, gt=0)
-    sea_load_kg: float = Field(default=27000.0, gt=0)
-
-
-# =========================================================
-# API request
-# =========================================================
 
 class CalculationRequest(BaseModel):
     cycle_band: CycleBand
@@ -140,34 +172,35 @@ class CalculationRequest(BaseModel):
     manufacturing_country: str
     expected_cycles: int = Field(gt=0)
     workpiece_material: WorkpieceMaterial
-    material_thickness_mm: float = Field(default=1.0, gt=0)
-    tolerance_level: ToleranceLevel = ToleranceLevel.STANDARD
-    surface_finish: SurfaceFinish = SurfaceFinish.STANDARD
+    material_thickness_mm: float = Field(
+        default=1.0,
+        gt=0,
+    )
+    tolerance_level: ToleranceLevel = (
+        ToleranceLevel.STANDARD
+    )
+    surface_finish: SurfaceFinish = (
+        SurfaceFinish.STANDARD
+    )
     abrasive_material: bool = False
     corrosive_environment: bool = False
-
-    truck_distance_km: float = Field(default=1700.0, ge=0)
-    sea_distance_km: float | None = None
-    sea_distance_nm: float = Field(default=10700.0, ge=0)
-
-    logistics: LogisticsAssumptions | None = None
-
+    truck_distance_km: float = Field(ge=0)
+    sea_distance_km: float = Field(default=0, ge=0)
+    sea_distance_nm: float | None = Field(default=None, ge=0, allow_inf_nan=False)
+    logistics: LogisticsAssumptions = Field(default_factory=LogisticsAssumptions)
     includes_cooling: bool
     part: PartDimensions
     assumptions: CostAssumptions
 
     tooling_material_family: str | None = None
-    tooling_material_assumptions: ToolingMaterialAssumptions | None = None
-    manufacturing_route: ManufacturingRouteAssumptions | None = None
 
-    @model_validator(mode="before")
-    @classmethod
-    def reconcile_sea_distance(cls, data: dict):
-        if isinstance(data, dict):
-            # If sea_distance_km was provided but sea_distance_nm was not explicitly sent
-            if "sea_distance_km" in data and data.get("sea_distance_km") is not None and "sea_distance_nm" not in data:
-                data["sea_distance_nm"] = round(float(data["sea_distance_km"]) / 1.852, 1)
-        return data
+    tooling_material_assumptions: (
+        ToolingMaterialAssumptions | None
+    ) = None
+
+    manufacturing_route: (
+        ManufacturingRouteAssumptions | None
+    ) = None
 
 
 # =========================================================
@@ -200,21 +233,25 @@ class CalculationResponse(BaseModel):
 
     margin: float
     handling_cost: float
+    road_transport_cost: float = 0
+    sea_transport_cost: float = 0
     transport_cost: float
-    road_transport_cost: float = 0.0
-    sea_transport_cost: float = 0.0
     heat_treatment_cost: float
 
     total_price: float
-    currency: str = "EUR"
-    currency_symbol: str = "€"
 
     # Recommendation output
     recommended_material: str
+
     recommended_material_family: str
+
     recommendation_confidence: str
-    confidence_explanation: str = ""
 
     failure_modes: list[str]
+
     recommendation_reasons: list[str]
+
     recommended_operations: list[str]
+
+
+

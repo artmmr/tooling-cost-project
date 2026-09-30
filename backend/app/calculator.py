@@ -13,8 +13,6 @@ from app.tooling_materials import (
     TOOLING_MATERIALS,
 )
 
-from app.country_profiles import COUNTRY_PROFILES
-
 from app.models import (
     CalculationRequest,
     CalculationResponse,
@@ -642,47 +640,24 @@ def calculate(
 
 
     # ---------------------------------------------------------
-    # 22. Transport & Logistics
+    # 22. Transport
     # ---------------------------------------------------------
 
-    if request.logistics is not None:
-        truck_distance_km = request.logistics.truck_distance_km
-        road_cost_per_100_km = request.logistics.road_cost_per_100_km
-        road_load_kg = request.logistics.road_load_kg
+    logistics = request.logistics
+    sea_nm = (request.sea_distance_nm if request.sea_distance_nm is not None
+              else request.sea_distance_km / 1.852)
 
-        sea_distance_nm = request.logistics.sea_distance_nm
-        sea_container_cost = request.logistics.sea_container_cost
-        sea_reference_distance_nm = request.logistics.sea_reference_distance_nm
-        sea_load_kg = request.logistics.sea_load_kg
-    else:
-        truck_distance_km = request.truck_distance_km
-        road_cost_per_100_km = ROAD_COST_PER_100_KM
-        road_load_kg = ROAD_LOAD_KG
-
-        sea_distance_nm = request.sea_distance_nm
-        sea_container_cost = 8000.0
-        sea_reference_distance_nm = 10700.0
-        sea_load_kg = SEA_LOAD_KG
+    def load_share(capacity):
+        share = tooling_weight_kg / capacity
+        return ceil(share) if logistics.allocation == "whole_load" else share
 
     road_transport_cost = (
-        truck_distance_km
-        / 100
-        * road_cost_per_100_km
-        * (
-            tooling_weight_kg
-            / road_load_kg
-        )
-        * 2
+        request.truck_distance_km * logistics.road_rate_eur_per_km
+        * load_share(logistics.road_load_kg) * logistics.road_journeys
     )
-
     sea_transport_cost = (
-        (sea_distance_nm / sea_reference_distance_nm)
-        * sea_container_cost
-        * (
-            tooling_weight_kg
-            / sea_load_kg
-        )
-        * 2
+        sea_nm * logistics.sea_rate_eur_per_nm
+        * load_share(logistics.sea_load_kg) * logistics.sea_journeys
     )
 
     transport_cost = (
@@ -702,6 +677,7 @@ def calculate(
         + transport_cost
     )
 
+
     total_price = (
         total_before_final_markup
         * 1.1
@@ -709,22 +685,12 @@ def calculate(
 
 
     # ---------------------------------------------------------
-    # 24. Currency determination
-    # ---------------------------------------------------------
-
-    country_profile = COUNTRY_PROFILES.get(
-        request.manufacturing_country.upper(),
-        {},
-    )
-    currency = country_profile.get("currency", "EUR")
-    currency_symbol = country_profile.get("currency_symbol", "€")
-
-
-    # ---------------------------------------------------------
-    # 25. API response
+    # 24. API response
     # ---------------------------------------------------------
 
     return CalculationResponse(
+        road_transport_cost=road_transport_cost,
+        sea_transport_cost=sea_transport_cost,
         tooling_material=(
             recommended_profile.name
         ),
@@ -801,24 +767,8 @@ def calculate(
             transport_cost
         ),
 
-        road_transport_cost=(
-            road_transport_cost
-        ),
-
-        sea_transport_cost=(
-            sea_transport_cost
-        ),
-
         total_price=(
             total_price
-        ),
-
-        currency=(
-            currency
-        ),
-
-        currency_symbol=(
-            currency_symbol
         ),
 
         recommended_material=(
@@ -831,10 +781,6 @@ def calculate(
 
         recommendation_confidence=(
             recommendation.confidence
-        ),
-
-        confidence_explanation=(
-            recommendation.confidence_explanation
         ),
 
         failure_modes=(

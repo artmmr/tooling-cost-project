@@ -1,4 +1,3 @@
-from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI, HTTPException
 
@@ -49,7 +48,10 @@ def health_check() -> dict[str, str]:
 def calculate_tooling(
     request: CalculationRequest,
 ) -> CalculationResponse:
-    return calculate(request)
+    try:
+        return calculate(request)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 @app.get("/api/countries")
@@ -58,8 +60,6 @@ def get_countries():
         {
             "code": code,
             "name": profile["name"],
-            "currency": profile.get("currency", "EUR"),
-            "currency_symbol": profile.get("currency_symbol", "€"),
         }
         for code, profile in COUNTRY_PROFILES.items()
     ]
