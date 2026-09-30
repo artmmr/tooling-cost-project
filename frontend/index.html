@@ -83,7 +83,7 @@
 
                   <div class="field">
                     <label for="inp-expected-cycles">Expected production cycles</label>
-                    <input id="inp-expected-cycles" type="number" min="1" step="1000" />
+                    <input id="inp-expected-cycles" type="number" min="0" step="1000" />
                   </div>
                 </div>
               </section>
@@ -105,7 +105,7 @@
 
                   <div class="field field-span-2" id="material-thickness-field">
                     <label for="inp-material-thickness">Material thickness <span class="unit">mm</span></label>
-                    <input id="inp-material-thickness" type="number" min="0.01" step="0.1" />
+                    <input id="inp-material-thickness" type="number" min="0" step="0.1" />
                     <p class="field-help">Primarily relevant for stamping, forming and deep drawing.</p>
                   </div>
                 </div>
@@ -237,11 +237,11 @@
                     <div class="form-grid two-col">
                       <div class="field">
                         <label for="inp-engineering-rate">Engineering rate <span class="unit">€/h</span></label>
-                        <input id="inp-engineering-rate" type="number" min="0.01" step="1" />
+                        <input id="inp-engineering-rate" type="number" min="0" step="1" />
                       </div>
                       <div class="field">
                         <label for="inp-assembly-rate">Assembly / operator <span class="unit">€/h</span></label>
-                        <input id="inp-assembly-rate" type="number" min="0.01" step="1" />
+                        <input id="inp-assembly-rate" type="number" min="0" step="1" />
                       </div>
                     </div>
                   </div>
@@ -251,19 +251,19 @@
                     <div class="form-grid two-col">
                       <div class="field">
                         <label for="inp-cnc3-rate">CNC 3-axis <span class="unit">€/h</span></label>
-                        <input id="inp-cnc3-rate" type="number" min="0.01" step="1" />
+                        <input id="inp-cnc3-rate" type="number" min="0" step="1" />
                       </div>
                       <div class="field">
                         <label for="inp-cnc5-rate">CNC 5-axis <span class="unit">€/h</span></label>
-                        <input id="inp-cnc5-rate" type="number" min="0.01" step="1" />
+                        <input id="inp-cnc5-rate" type="number" min="0" step="1" />
                       </div>
                       <div class="field">
                         <label for="inp-edm-rate">Electro-Discharge Machining <span class="unit">€/h</span></label>
-                        <input id="inp-edm-rate" type="number" min="0.01" step="1" />
+                        <input id="inp-edm-rate" type="number" min="0" step="1" />
                       </div>
                       <div class="field">
                         <label for="inp-grinding-rate">Grinding <span class="unit">€/h</span></label>
-                        <input id="inp-grinding-rate" type="number" min="0.01" step="1" />
+                        <input id="inp-grinding-rate" type="number" min="0" step="1" />
                       </div>
                     </div>
                   </div>
@@ -392,15 +392,15 @@
                       </div>
                       <div class="field">
                         <label for="inp-tool-price">Material price <span class="unit">€/t</span></label>
-                        <input id="inp-tool-price" type="number" min="0.01" step="1" />
+                        <input id="inp-tool-price" type="number" min="0" step="1" />
                       </div>
                       <div class="field">
                         <label for="inp-tool-mrr">Removal rate <span class="unit">cm³/min</span></label>
-                        <input id="inp-tool-mrr" type="number" min="0.001" step="0.01" />
+                        <input id="inp-tool-mrr" type="number" min="0" step="0.01" />
                       </div>
                       <div class="field">
                         <label for="inp-milling-volume-factor">Milling volume factor</label>
-                        <input id="inp-milling-volume-factor" type="number" min="0.000001" step="0.00001" />
+                        <input id="inp-milling-volume-factor" type="number" min="0" step="0.00001" />
                       </div>
                       <div class="field">
                         <label for="inp-milling-tool-price">Milling tool price <span class="unit">€</span></label>
