@@ -1,7 +1,11 @@
 from enum import Enum
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel as PydanticBaseModel, ConfigDict, Field
+
+
+class BaseModel(PydanticBaseModel):
+    model_config = ConfigDict(allow_inf_nan=False)
 
 
 # =========================================================
@@ -15,6 +19,29 @@ class CycleBand(str, Enum):
 
 
 class ProcessType(str, Enum):
+    BENDING = "bending"
+    METAL_EXTRUSION = "metal_extrusion"
+    DIE_CASTING = "die_casting"
+    SAND_CASTING = "sand_casting"
+    INVESTMENT_CASTING = "investment_casting"
+    CLOSED_DIE_FORGING = "closed_die_forging"
+    PLASTIC_EXTRUSION = "plastic_extrusion"
+    BLOW_MOLDING = "blow_molding"
+    COMPRESSION_MOLDING = "compression_molding"
+    TRANSFER_MOLDING = "transfer_molding"
+    ROTATIONAL_MOLDING = "rotational_molding"
+    POWDER_METALLURGY = "powder_metallurgy"
+    METAL_INJECTION_MOLDING = "metal_injection_molding"
+    COMPOSITE_MOLDING = "composite_molding"
+    PULTRUSION = "pultrusion"
+    PUNCHING_BLANKING = "punching_blanking"
+    FINE_BLANKING = "fine_blanking"
+    PROGRESSIVE_DIE_STAMPING = "progressive_die_stamping"
+    TUBE_HYDROFORMING = "tube_hydroforming"
+    SHEET_HYDROFORMING = "sheet_hydroforming"
+    SPINNING = "spinning"
+
+    # Existing API values remain valid and retain their original rules.
     PLASTIC_MOLDING = "plastic_molding"
     PLASTIC_INJECTION = "plastic_injection"
     FOAMING = "foaming"
@@ -31,6 +58,10 @@ class ProcessType(str, Enum):
 # =========================================================
 
 class WorkpieceMaterial(str, Enum):
+    CAST_ALUMINUM = "cast_aluminum"
+    CAST_IRON = "cast_iron"
+    METAL_POWDER = "metal_powder"
+    FIBER_COMPOSITE = "fiber_composite"
     # Plastic materials
     STANDARD_THERMOPLASTIC = (
         "standard_thermoplastic"
@@ -165,12 +196,38 @@ class LogisticsAssumptions(BaseModel):
     allocation: Literal["proportional", "whole_load"] = "proportional"
 
 
+class BlockOverride(BaseModel):
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+    component_id: str
+    pieces: int | None = Field(default=None, ge=1, le=1000)
+    stock_form: Literal["Rectangular block", "Round billet"] | None = None
+    nominal_length_mm: float | None = Field(default=None, gt=0)
+    nominal_width_mm: float | None = Field(default=None, gt=0)
+    nominal_depth_mm: float | None = Field(default=None, gt=0)
+    enlargement_ratio: float | None = Field(default=None, ge=0, le=1)
+    side_reserve_x_mm: float | None = Field(default=None, ge=0)
+    side_reserve_y_mm: float | None = Field(default=None, ge=0)
+    backing_mm: float | None = Field(default=None, ge=0)
+    allowance_mm: float | None = Field(default=None, ge=0)
+    rounding_mm: float | None = Field(default=None, gt=0)
+    material_family: str | None = None
+    tooling_material_assumptions: ToolingMaterialAssumptions | None = None
+    manufacturing_route: ManufacturingRouteAssumptions | None = None
+    # This workbook contains envelopes, not CAD-derived machining volumes.
+    machining_volume_m3: float | None = Field(default=None, ge=0)
+    purchased_unit_cost_eur: float | None = Field(default=None, ge=0)
+    purchased_unit_weight_kg: float | None = Field(default=None, ge=0)
+
+
 class CalculationRequest(BaseModel):
-    cycle_band: CycleBand
+    cycle_band: CycleBand = CycleBand.UP_TO_10K
     process: ProcessType
     parts_per_mold: int = Field(ge=1, le=30)
     manufacturing_country: str
-    expected_cycles: int = Field(gt=0)
+    expected_cycles: int = Field(default=10000, gt=0)
+    expected_quantity: int | None = Field(default=None, gt=0)
+    sizing_mode: Literal["reference", "part_scaled"] = "part_scaled"
+    block_overrides: list[BlockOverride] = Field(default_factory=list, max_length=100)
     workpiece_material: WorkpieceMaterial
     material_thickness_mm: float = Field(
         default=1.0,
@@ -207,7 +264,57 @@ class CalculationRequest(BaseModel):
 # API response
 # =========================================================
 
+class ToolingBlockComponentResponse(BaseModel):
+    component_id: str = ""
+    record_id: str = ""
+    component: str
+    role: str
+    pieces: int
+    stock_form: str
+    raw_stock: str
+    raw_length_mm: float | None = None
+    raw_width_mm: float | None = None
+    raw_height_mm: float | None = None
+    material_note: str
+    heating_cooling: str
+    assumption: str
+    purchased: bool = False
+    pieces_per_set: int = 1
+    finished_length_mm: float | None = None
+    finished_width_mm: float | None = None
+    finished_height_mm: float | None = None
+    sizing_inputs: dict[str, float] = Field(default_factory=dict)
+    raw_volume_m3: float = 0
+    finished_volume_m3: float = 0
+    machining_volume_m3: float = 0
+    machining_basis: str = ""
+    weight_kg: float = 0
+    material_family: str | None = None
+    costing_material: str = ""
+    material_assumptions: ToolingMaterialAssumptions | None = None
+    manufacturing_route: ManufacturingRouteAssumptions | None = None
+    cost_before_commercial: float | None = None
+    purchased_unit_cost_eur: float | None = None
+    purchased_unit_weight_kg: float | None = None
+    modified: bool = False
+
+
 class CalculationResponse(BaseModel):
+    calculation_basis: str = "legacy"
+    expected_quantity: int | None = None
+    total_machined_blocks: int = 0
+    total_purchased_assemblies: int = 0
+    grade_candidates: str = ""
+    grade_treatment: str = ""
+    grade_scope: str = ""
+    selection_conditions: str = ""
+    tooling_scope: str = ""
+    estimate_warnings: list[str] = Field(default_factory=list)
+    purchased_assemblies_cost: float = 0
+    estimate_complete: bool = True
+    final_markup: float = 0
+    cost_model_note: str = ""
+    recommendation_confidence_explanation: str = ""
     tooling_material: str
 
     gross_length_mm: float
@@ -215,6 +322,10 @@ class CalculationResponse(BaseModel):
     gross_height_mm: float
 
     tooling_weight_kg: float
+    tooling_quantity_band: str = ""
+    tooling_concept: str = ""
+    tooling_sizing_basis: str = ""
+    tooling_blocks: list[ToolingBlockComponentResponse] = Field(default_factory=list)
 
     outside_machining_volume_m3: float
     inside_machining_volume_m3: float

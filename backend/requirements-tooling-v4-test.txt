@@ -1,0 +1,6 @@
+# Isolated local tests; retain the project's production requirements.
+fastapi==0.115.14
+pydantic>=2.7,<3
+httpx==0.28.1
+uvicorn>=0.30,<1
+openpyxl>=3.1,<4

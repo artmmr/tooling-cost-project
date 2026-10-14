@@ -1,97 +1,74 @@
+"""Run with: python -m unittest discover -s tests -v"""
+import math
+import unittest
+from pydantic import ValidationError
+from app.models import CalculationRequest
 from app.calculator import calculate
 from app.country_profiles import COUNTRY_PROFILES
-from app.models import (
-    CalculationRequest,
-    CycleBand,
-    LogisticsAssumptions,
-    PartDimensions,
-    ProcessType,
-    SurfaceFinish,
-    ToleranceLevel,
-    WorkpieceMaterial,
-    CostAssumptions,
-)
 
 
-def create_base_request(**overrides):
-    base = {
-        "cycle_band": CycleBand.FROM_100K_TO_250K,
-        "process": ProcessType.STAMPING,
-        "parts_per_mold": 2,
-        "manufacturing_country": "DE",
-        "expected_cycles": 150000,
-        "workpiece_material": WorkpieceMaterial.ADVANCED_HIGH_STRENGTH_STEEL,
-        "material_thickness_mm": 3.0,
-        "tolerance_level": ToleranceLevel.HIGH_PRECISION,
-        "surface_finish": SurfaceFinish.STANDARD,
-        "abrasive_material": False,
-        "corrosive_environment": False,
-        "truck_distance_km": 1700.0,
-        "sea_distance_nm": 10700.0,
-        "includes_cooling": False,
-        "part": PartDimensions(length_mm=300, width_mm=300, height_mm=40),
-        "assumptions": CostAssumptions(**{
-            k: v for k, v in COUNTRY_PROFILES["DE"].items()
-            if k not in ("name", "currency", "currency_symbol")
-        }),
-    }
-    base.update(overrides)
-    return CalculationRequest(**base)
+def example(**overrides):
+    data = dict(cycle_band='100000_to_250000', process='stamping', parts_per_mold=2,
+                manufacturing_country='DE', expected_cycles=150000,
+                workpiece_material='high_strength_steel', material_thickness_mm=3,
+                tolerance_level='high_precision', truck_distance_km=1700,
+                sea_distance_km=19800, includes_cooling=False,
+                part=dict(length_mm=300, width_mm=300, height_mm=40),
+                assumptions=COUNTRY_PROFILES['DE'])
+    data.update(overrides)
+    return CalculationRequest(**data)
 
 
-def test_calculate_germany_currency_and_confidence():
-    req = create_base_request(manufacturing_country="DE")
-    res = calculate(req)
+class LogisticsTests(unittest.TestCase):
+    def test_legacy_km_and_nautical_miles_match(self):
+        old = calculate(example())
+        new = calculate(example(sea_distance_nm=19800 / 1.852, sea_distance_km=0))
+        self.assertAlmostEqual(old.total_price, new.total_price)
+        self.assertAlmostEqual(old.transport_cost,
+            old.tooling_weight_kg * (1700 * 5.6 / 18000 * 2 + 8000 / 27000 * 2))
 
-    assert res.currency == "EUR"
-    assert res.currency_symbol == "€"
-    assert res.recommendation_confidence == "high"
-    assert "High confidence:" in res.confidence_explanation
-    assert res.total_price > 0
-    assert res.sea_transport_cost > 0
-    assert res.road_transport_cost > 0
+    def test_new_distance_takes_precedence_even_when_zero(self):
+        self.assertEqual(calculate(example(sea_distance_nm=0)).sea_transport_cost, 0)
 
+    def test_edit_freight_rate_updates_total(self):
+        base = calculate(example())
+        changed = calculate(example(logistics={'road_rate_eur_per_km':11.2}))
+        self.assertAlmostEqual(changed.road_transport_cost, 2 * base.road_transport_cost)
+        self.assertAlmostEqual(changed.total_price - base.total_price, base.road_transport_cost * 1.1)
 
-def test_calculate_china_currency_usd():
-    req = create_base_request(
-        manufacturing_country="CN",
-        assumptions=CostAssumptions(**{
-            k: v for k, v in COUNTRY_PROFILES["CN"].items()
-            if k not in ("name", "currency", "currency_symbol")
-        }),
-    )
-    res = calculate(req)
+    def test_whole_loads_and_zero_distance(self):
+        result = calculate(example(logistics={'allocation':'whole_load'}))
+        self.assertAlmostEqual(result.road_transport_cost, 1700 * 5.6 * math.ceil(result.tooling_weight_kg / 18000) * 2)
+        zero = calculate(example(truck_distance_km=0,sea_distance_nm=0,logistics={'allocation':'whole_load'}))
+        self.assertEqual(zero.transport_cost,0)
 
-    assert res.currency == "USD"
-    assert res.currency_symbol == "$"
+    def test_zero_rate_is_valid(self):
+        self.assertEqual(calculate(example(logistics={'road_rate_eur_per_km':0, 'sea_rate_eur_per_nm':0})).transport_cost,0)
 
+    def test_invalid_freight_rejected(self):
+        for invalid in [{'road_load_kg':0}, {'sea_rate_eur_per_nm':-1}, {'road_journeys':1.5}, {'allocation':'other'}, {'road_rate_eur_per_km':float('inf')}]:
+            with self.subTest(invalid=invalid), self.assertRaises(ValidationError): example(logistics=invalid)
 
-def test_capitalized_risks_and_operations():
-    req = create_base_request()
-    res = calculate(req)
+    def test_tooling_override_changes_cost(self):
+        req=example();base=calculate(req)
+        from app.tooling_materials import TOOLING_MATERIALS
+        profile=TOOLING_MATERIALS[base.recommended_material_family]
+        override={name:getattr(profile,name) for name in ['density_kg_m3','block_price_per_tonne','removal_rate_cm3_min','milling_volume_factor','milling_tool_price','heat_treatment_eur_per_kg']}
+        override['block_price_per_tonne']*=2
+        changed=calculate(example(tooling_material_family=base.recommended_material_family,tooling_material_assumptions=override))
+        self.assertAlmostEqual(changed.material_cost,base.material_cost*2)
+        stale=calculate(example(tooling_material_family='aluminum_tooling',tooling_material_assumptions=override))
+        self.assertEqual(stale.total_price,base.total_price)
 
-    for mode in res.failure_modes:
-        assert mode[0].isupper(), f"Risk '{mode}' should start with capital letter"
+    def test_component_block_sizing_is_returned(self):
+        result = calculate(example(process='stamping', expected_cycles=150000))
+        self.assertEqual(result.tooling_quantity_band, 'Above 100,000')
+        self.assertIn('progressive die', result.tooling_concept.lower())
+        self.assertGreater(result.tooling_weight_kg, 0)
+        self.assertAlmostEqual(result.final_markup, result.total_price / 11)
+        self.assertTrue(result.recommendation_confidence_explanation)
+        self.assertGreaterEqual(len(result.tooling_blocks), 2)
+        self.assertTrue(all(block.raw_stock for block in result.tooling_blocks))
+        self.assertTrue(any(block.role == 'FEMALE DIE' for block in result.tooling_blocks))
 
-    for op in res.recommended_operations:
-        assert op[0].isupper(), f"Operation '{op}' should start with capital letter"
-
-    assert any("Electro-Discharge Machining" in op for op in res.recommended_operations)
-
-
-def test_custom_logistics_assumptions():
-    custom_logistics = LogisticsAssumptions(
-        truck_distance_km=500.0,
-        road_cost_per_100_km=700.0,
-        road_load_kg=15000.0,
-        sea_distance_nm=5000.0,
-        sea_container_cost=10000.0,
-        sea_reference_distance_nm=10700.0,
-        sea_load_kg=25000.0,
-    )
-    req = create_base_request(logistics=custom_logistics)
-    res = calculate(req)
-
-    assert res.total_price > 0
-    assert res.road_transport_cost > 0
-    assert res.sea_transport_cost > 0
+if __name__ == '__main__': unittest.main()

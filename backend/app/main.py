@@ -7,6 +7,8 @@ from app.tooling_materials import TOOLING_MATERIALS
 from app.calculator import calculate
 from app.models import CalculationRequest, CalculationResponse
 from app.reference_data import load_reference_summary
+from app.tooling_catalog import public_catalog
+from dataclasses import asdict
 
 
 app = FastAPI(
@@ -68,6 +70,16 @@ def get_countries():
 @app.get("/api/reference-data")
 def get_reference_data():
     return load_reference_summary()
+
+
+@app.get("/api/tooling-catalog")
+def get_tooling_catalog():
+    return public_catalog()
+
+
+@app.get("/api/tooling-materials")
+def get_tooling_materials():
+    return {code: asdict(profile) for code, profile in TOOLING_MATERIALS.items()}
 
 
 @app.get("/api/countries/{country_code}")

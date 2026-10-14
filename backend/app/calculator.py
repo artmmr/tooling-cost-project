@@ -1,6 +1,7 @@
 from math import ceil
 
 from app.recommendation import recommend_tooling
+from app.block_sizing import build_tooling_sizing
 
 from app.constants import (
     ROAD_COST_PER_100_KM,
@@ -16,6 +17,7 @@ from app.tooling_materials import (
 from app.models import (
     CalculationRequest,
     CalculationResponse,
+    ToolingBlockComponentResponse,
 )
 
 
@@ -94,6 +96,13 @@ def validate_route(
 def calculate(
     request: CalculationRequest,
 ) -> CalculationResponse:
+
+    from app.tooling_catalog import is_workbook_process
+    if is_workbook_process(request.process.value):
+        from app.workbook_calculator import calculate_workbook
+        return calculate_workbook(request)
+    if request.block_overrides:
+        raise ValueError("Component overrides are supported only for the detailed workbook processes.")
 
     # ---------------------------------------------------------
     # 1. Recommend tooling material
@@ -305,76 +314,42 @@ def calculate(
 
 
     # ---------------------------------------------------------
-    # 6. Gross tooling dimensions
+    # 6. Component-based tooling block sizing
     # ---------------------------------------------------------
 
-    gross_length_mm = (
-        part_length
-        * parts_per_mold
-        + 150 * 2
+    sizing = build_tooling_sizing(
+        process=request.process.value,
+        expected_quantity=request.expected_cycles,
+        part_length_mm=part_length,
+        part_width_mm=part_width,
+        part_height_mm=part_height,
+        parts_per_tool=parts_per_mold,
     )
 
-    gross_width_mm = (
-        part_width
-        + 150 * 2
-    )
-
-    gross_height_mm = (
-        part_height
-        / 2
-        * 3
-        * 2
-    )
-
-
-    # ---------------------------------------------------------
-    # 7. Tooling volume and weight
-    # ---------------------------------------------------------
-
-    gross_volume_m3 = (
-        gross_length_mm
-        * gross_width_mm
-        * gross_height_mm
-        / 1_000_000_000
-    )
+    gross_length_mm = sizing.gross_length_mm
+    gross_width_mm = sizing.gross_width_mm
+    gross_height_mm = sizing.gross_height_mm
 
     tooling_weight_kg = (
-        gross_volume_m3
+        sizing.raw_volume_m3
         * density_kg_m3
     )
 
 
     # ---------------------------------------------------------
-    # 8. Machining volumes
+    # 7. Machining volumes
     # ---------------------------------------------------------
 
     outside_machining_volume_m3 = (
-        (
-            (
-                gross_length_mm + 5
-            )
-            * (
-                gross_width_mm + 5
-            )
-            * (
-                gross_height_mm + 5
-            )
+        max(
+            sizing.raw_volume_m3
+            - sizing.finished_volume_m3,
+            0,
         )
-        -
-        (
-            gross_length_mm
-            * gross_width_mm
-            * gross_height_mm
-        )
-    ) / 1_000_000_000
-
+    )
 
     inside_machining_volume_m3 = (
-        part_length
-        * part_width
-        * part_height
-        / 1_000_000_000
-        * parts_per_mold
+        sizing.working_volume_m3
     )
 
 
@@ -691,6 +666,13 @@ def calculate(
     return CalculationResponse(
         road_transport_cost=road_transport_cost,
         sea_transport_cost=sea_transport_cost,
+        final_markup=total_before_final_markup * 0.1,
+        total_machined_blocks=sum(component.pieces for component in sizing.components),
+        recommendation_confidence_explanation=(
+            "Your inputs match a specific material-selection rule. "
+            if recommendation.confidence == "high" else
+            "This is a general material recommendation for the supplied conditions. "
+        ) + "Tool life and suitability still require engineering review. " + " ".join(recommendation.reasons),
         tooling_material=(
             recommended_profile.name
         ),
@@ -710,6 +692,53 @@ def calculate(
         tooling_weight_kg=(
             tooling_weight_kg
         ),
+        tooling_quantity_band=(
+            sizing.quantity_band
+        ),
+        tooling_concept=(
+            sizing.tooling_concept
+        ),
+        tooling_sizing_basis=(
+            sizing.sizing_basis
+        ),
+        tooling_blocks=[
+            ToolingBlockComponentResponse(
+                component=(
+                    component.component
+                ),
+                role=(
+                    component.role
+                ),
+                pieces=(
+                    component.pieces
+                ),
+                stock_form=(
+                    component.stock_form
+                ),
+                raw_stock=(
+                    component.raw_stock_label
+                ),
+                raw_length_mm=(
+                    component.raw_length_mm
+                ),
+                raw_width_mm=(
+                    component.raw_width_mm
+                ),
+                raw_height_mm=(
+                    component.raw_height_mm
+                ),
+                material_note=(
+                    component.material_note
+                ),
+                heating_cooling=(
+                    component.heating_cooling
+                ),
+                assumption=(
+                    component.assumption
+                ),
+            )
+            for component in sizing.components
+        ],
 
         outside_machining_volume_m3=(
             outside_machining_volume_m3
