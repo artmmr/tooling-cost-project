@@ -72,18 +72,18 @@
                   </div>
 
                   <div class="field">
-                    <label for="inp-pqty">Parts per mold / tool</label>
+                    <label for="inp-pqty" id="sets-label">Parts per mold / tool</label>
                     <select id="inp-pqty"></select>
                   </div>
 
                   <div class="field">
-                    <label for="inp-cycles">Tool life band</label>
+                    <label for="inp-cycles" id="quantity-band-label">Tool life band</label>
                     <select id="inp-cycles"></select>
                   </div>
 
                   <div class="field">
-                    <label for="inp-expected-cycles">Expected production cycles</label>
-                    <input id="inp-expected-cycles" type="number" min="0" step="1000" />
+                    <label for="inp-expected-cycles" id="quantity-label">Expected production cycles</label>
+                    <input id="inp-expected-cycles" type="number" min="1" step="1" />
                   </div>
                 </div>
               </section>
@@ -105,8 +105,8 @@
 
                   <div class="field field-span-2" id="material-thickness-field">
                     <label for="inp-material-thickness">Material thickness <span class="unit">mm</span></label>
-                    <input id="inp-material-thickness" type="number" min="0" step="0.1" />
-                    <p class="field-help">Primarily relevant for stamping, forming and deep drawing.</p>
+                    <input id="inp-material-thickness" type="number" min="0" step="1" />
+                    <p class="field-help">Wall or sheet thickness. Core envelopes may use this value.</p>
                   </div>
                 </div>
 
@@ -126,6 +126,18 @@
                       <input id="inp-h" type="number" min="1" step="1" />
                     </div>
                   </div>
+                </div>
+                <p id="part-shape-note" class="field-help"></p>
+                <div id="workbook-inputs" hidden>
+                  <div class="field">
+                    <label for="inp-sizing-mode">Block sizing basis</label>
+                    <select id="inp-sizing-mode">
+                      <option value="part_scaled">Custom part: adapt reference envelopes</option>
+                      <option value="reference">Exact reference example</option>
+                    </select>
+                  </div>
+                  <p id="reference-scope" class="field-help"></p>
+                  <button id="use-reference-part" type="button" class="secondary-btn">Restore example geometry</button>
                 </div>
               </section>
 
@@ -208,7 +220,7 @@
                   </div>
                   <div class="field">
                     <label for="inp-sea">Sea distance <span class="unit">nautical miles</span></label>
-                    <input id="inp-sea" type="number" min="0" step="any" />
+                    <input id="inp-sea" type="number" min="0" step="1" />
                   </div>
                 </div>
               </section>
@@ -217,7 +229,7 @@
                 <h3>Display currency</h3>
                 <p id="currency-note" class="field-help">European countries: EUR. Other countries: USD.</p>
                 <div class="form-grid two-col">
-                  <div class="field"><label for="inp-fx">US dollars per 1 euro</label><input id="inp-fx" type="number" min="0.000001" step="any" placeholder="Required for USD" /></div>
+                  <div class="field"><label for="inp-fx">US dollars per 1 euro</label><input id="inp-fx" type="number" min="0" step="1" placeholder="Required for USD" /></div>
                   <div class="field"><label for="inp-fx-date">Exchange rate date</label><input id="inp-fx-date" type="date" /></div>
                 </div>
                 <p class="field-help">Enter your agreed exchange rate and its date. Rates are manual and are not refreshed automatically.</p>
@@ -273,7 +285,7 @@
                     <div class="form-grid three-col">
                       <div class="field">
                         <label for="inp-electricity">Electricity <span class="unit">€/kWh</span></label>
-                        <input id="inp-electricity" type="number" min="0.001" step="0.001" />
+                        <input id="inp-electricity" type="number" min="0" step="1" />
                       </div>
                       <div class="field">
                         <label for="inp-machine-efficiency">Machine efficiency <span class="unit">%</span></label>
@@ -322,7 +334,7 @@
                 <div class="result-card-header">
                   <div>
                     <p class="eyebrow">Should-cost estimate</p>
-                    <h2>Tooling price</h2>
+                    <h2 id="price-heading">Tooling price</h2>
                   </div>
                   <span id="estimate-state" class="status-chip accent" aria-live="polite">Not calculated</span>
                 </div>
@@ -332,6 +344,7 @@
                   <strong id="out-total">—</strong>
                 </div>
                 <p class="price-caption">Estimated tooling price · <span id="result-currency">EUR</span></p>
+                <p id="estimate-scope" class="estimate-warning" role="status"></p>
 
                 <div class="result-summary-grid">
                   <div class="summary-tile wide">
@@ -339,14 +352,64 @@
                     <strong id="out-c12">—</strong>
                   </div>
                   <div class="summary-tile wide">
-                    <span>Gross tooling dimensions</span>
+                    <span>Maximum individual stock dimensions</span>
                     <strong id="out-c13">—</strong>
                   </div>
                 </div>
 
                 <div class="model-note">
-                  The estimate uses the recommended tooling material and manufacturing route. Benchmark assumptions can be reviewed and manually overridden below.
+                  Working blocks are not a complete installed tool. Component quantities, material benchmarks and tooling manufacturing routes can be reviewed below.
                 </div>
+
+                <details class="technical-details tooling-block-details" open>
+                  <summary>Tool block sizing</summary>
+                  <div class="details-body">
+                    <p id="tooling-sizing-basis" class="field-help standalone">
+                      Calculate to see the working-block sizing assumptions.
+                    </p>
+                    <p class="field-help">Scroll across the table to see stock, material and process details.</p>
+                    <div class="table-wrap" role="region" aria-label="Component stock and material details" tabindex="0">
+                      <table class="outputs-table block-table" id="out-blocks">
+                        <thead>
+                          <tr>
+                            <th>Component</th>
+                            <th>Role</th>
+                            <th>Pieces</th>
+                            <th>Raw stock</th>
+                            <th>Material / process note</th>
+                          </tr>
+                        </thead>
+                        <tbody></tbody>
+                      </table>
+                    </div>
+                  </div>
+                </details>
+
+                <section id="workbook-results" hidden>
+                  <p id="block-counts" class="field-help"></p>
+                  <p id="grade-summary" class="field-help"></p>
+                  <div class="section-title-row">
+                    <h3>Component inputs</h3>
+                    <span id="block-modified" class="summary-meta">Workbook defaults</span>
+                  </div>
+                  <div id="block-editors"></div>
+                  <button id="reset-blocks" type="button" class="secondary-btn">Restore all component defaults</button>
+                  <details class="technical-details">
+                    <summary>Estimate scope and design checks</summary>
+                    <ul id="estimate-warnings" class="recommendation-list"></ul>
+                    <p id="cost-model-note" class="field-help"></p>
+                    <h4>Before ordering stock</h4>
+                    <ul id="sizing-checklist" class="recommendation-list"></ul>
+                  </details>
+                  <details class="technical-details">
+                    <summary>Block roles and sizing rules</summary>
+                    <dl id="sizing-glossary" class="sizing-glossary"></dl>
+                    <ol id="sizing-steps" class="recommendation-list"></ol>
+                    <h4>Worked example: 100 mm wax sphere</h4>
+                    <p class="field-help">Two female halves enclose the sphere. Select Investment casting to calculate this example and edit its assumptions.</p>
+                    <div class="table-wrap"><table class="outputs-table"><tbody id="sizing-example"></tbody></table></div>
+                  </details>
+                </section>
 
                 <details class="technical-details">
                   <summary>Cost breakdown &amp; technical calculation details</summary>
@@ -374,7 +437,7 @@
                   <strong id="rec-material">—</strong>
                 </div>
 
-                <details class="details-card tooling-assumptions" open>
+                <details id="legacy-tooling-assumptions" class="details-card tooling-assumptions" open>
                   <summary>
                     <span>Material &amp; manufacturing assumptions</span>
                     <span class="summary-meta">Editable</span>
@@ -396,11 +459,11 @@
                       </div>
                       <div class="field">
                         <label for="inp-tool-mrr">Removal rate <span class="unit">cm³/min</span></label>
-                        <input id="inp-tool-mrr" type="number" min="0" step="0.01" />
+                        <input id="inp-tool-mrr" type="number" min="0" step="1" />
                       </div>
                       <div class="field">
                         <label for="inp-milling-volume-factor">Milling volume factor</label>
-                        <input id="inp-milling-volume-factor" type="number" min="0" step="0.00001" />
+                        <input id="inp-milling-volume-factor" type="number" min="0" step="1" />
                       </div>
                       <div class="field">
                         <label for="inp-milling-tool-price">Milling tool price <span class="unit">€</span></label>
@@ -408,7 +471,7 @@
                       </div>
                       <div class="field">
                         <label for="inp-heat-treatment">Heat treatment <span class="unit">€/kg</span></label>
-                        <input id="inp-heat-treatment" type="number" min="0" step="0.1" />
+                        <input id="inp-heat-treatment" type="number" min="0" step="1" />
                       </div>
                     </div>
 
@@ -486,7 +549,7 @@
             <div class="reference-card">
               <p class="reference-copy">Distances are entered in Overview. Freight prices below apply to one vehicle or sea load. The estimate allocates them to the tooling weight, or charges whole loads.</p>
               <div class="form-grid two-col">
-<div class="field"><label for="road-rate">Road freight rate <span class="unit">€/vehicle-km</span></label><input id="road-rate" type="number" min="0" step="any" value="5.6" /></div><div class="field"><label for="sea-rate">Sea freight rate <span class="unit">€/load-nautical mile</span></label><input id="sea-rate" type="number" min="0" step="any" value="0.7482828282828283" /></div><div class="field"><label for="road-load">Road load capacity <span class="unit">kg</span></label><input id="road-load" type="number" min="0.001" step="any" value="18000" /></div><div class="field"><label for="sea-load">Sea load capacity <span class="unit">kg</span></label><input id="sea-load" type="number" min="0.001" step="any" value="27000" /></div><div class="field"><label for="road-journeys">Charged road journeys <span class="unit"></span></label><input id="road-journeys" type="number" min="1" step="1" value="2" /></div><div class="field"><label for="sea-journeys">Charged sea journeys <span class="unit"></span></label><input id="sea-journeys" type="number" min="1" step="1" value="2" /></div>
+<div class="field"><label for="road-rate">Road freight rate <span class="unit">€/vehicle-km</span></label><input id="road-rate" type="number" min="0" step="1" value="5.6" /></div><div class="field"><label for="sea-rate">Sea freight rate <span class="unit">€/load-nautical mile</span></label><input id="sea-rate" type="number" min="0" step="1" value="0.7482828282828283" /></div><div class="field"><label for="road-load">Road load capacity <span class="unit">kg</span></label><input id="road-load" type="number" min="0" step="1" value="18000" /></div><div class="field"><label for="sea-load">Sea load capacity <span class="unit">kg</span></label><input id="sea-load" type="number" min="0" step="1" value="27000" /></div><div class="field"><label for="road-journeys">Charged road journeys <span class="unit"></span></label><input id="road-journeys" type="number" min="1" step="1" value="2" /></div><div class="field"><label for="sea-journeys">Charged sea journeys <span class="unit"></span></label><input id="sea-journeys" type="number" min="1" step="1" value="2" /></div>
               <div class="field field-span-2"><label for="freight-allocation">Freight allocation</label><select id="freight-allocation"><option value="proportional">Proportional share by weight</option><option value="whole_load">Whole loads (rounded up)</option></select></div>
               </div>
               <p class="field-help">Two charged journeys preserve the original estimate’s ×2 factor. Change this to match your shipment. Proportional allocation may differ from a carrier’s minimum charge.</p>
@@ -500,6 +563,7 @@
       </main>
     </div>
 
+    <script src="workbook.js"></script>
     <script src="app.js"></script>
   </body>
 </html>

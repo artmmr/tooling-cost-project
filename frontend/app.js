@@ -1,5 +1,5 @@
 const API_BASE_URL =
-  "https://tooling-cost-project.onrender.com";
+  globalThis.TOOLING_API_BASE_URL || "https://tooling-cost-project.onrender.com";
 
 
 let currentToolingDefaults = null;
@@ -529,6 +529,7 @@ function updateThicknessField() {
    ========================================================= */
 
 function syncExpectedCycles() {
+  if (WorkbookUI.chooseBand()) return;
   const cycleBand =
     document.getElementById(
       "inp-cycles",
@@ -645,11 +646,10 @@ function readStateRaw() {
       ).value,
 
     expected_cycles:
-      Number.parseInt(
+      Number(
         document.getElementById(
           "inp-expected-cycles",
         ).value,
-        10,
       ),
 
     workpiece_material:
@@ -829,13 +829,13 @@ function readStateRaw() {
 
 function validateState(state) {
   if (
-    !Number.isFinite(
+    !Number.isInteger(
       state.expected_cycles,
     ) ||
     state.expected_cycles <= 0
   ) {
     throw new Error(
-      "Expected cycles must be greater than zero.",
+      WorkbookUI.current() ? "Lifetime quantity must be a positive whole number." : "Expected cycles must be a positive whole number.",
     );
   }
 
@@ -919,7 +919,7 @@ function validateState(state) {
     state.parts_per_mold > 30
   ) {
     throw new Error(
-      "Parts per mold must be between 1 and 30.",
+      WorkbookUI.current() ? "Tool sets must be a whole number from 1 to 30." : "Parts per mold must be a whole number from 1 to 30.",
     );
   }
 
@@ -1250,80 +1250,111 @@ async function renderResult(
     )} mm`;
 
   const rows = [
+    ["Machined blocks", result.total_machined_blocks || result.tooling_blocks?.reduce((sum, b) => sum + b.pieces, 0), "number"],
+    ["Purchased assemblies", result.total_purchased_assemblies, "number"],
+    ["Purchased assembly quotes", result.purchased_assemblies_cost, "money"],
     [
       "Tooling weight [kg]",
       result.tooling_weight_kg,
+      "number",
+    ],
+
+    [
+      "Quantity band",
+      result.tooling_quantity_band,
+      "text",
+    ],
+
+    [
+      "Tooling concept",
+      result.tooling_concept,
+      "text",
     ],
 
     [
       "Outside machining volume [m³]",
       result.outside_machining_volume_m3,
+      "number",
     ],
 
     [
       "Inside machining volume [m³]",
       result.inside_machining_volume_m3,
+      "number",
     ],
 
     [
       "Milling time index",
       result.milling_time_index,
+      "number",
     ],
 
     [
       "Volume removed / tool lifetime [min]",
       result.removed_volume_time_min,
+      "number",
     ],
 
     [
       "Tooling material cost",
       result.material_cost,
+      "money",
     ],
 
     [
       "Raw material transformation cost",
       result.transformation_cost,
+      "money",
     ],
 
     [
       "Outside machining cost",
       result.outside_machining_cost,
+      "money",
     ],
 
     [
       "Inside machining cost",
       result.inside_machining_cost,
+      "money",
     ],
 
     [
       "Milling tool cost",
       result.milling_tool_cost,
+      "money",
     ],
 
     [
       "Heat treatment cost",
       result.heat_treatment_cost,
+      "money",
     ],
 
     [
       "Cooling system cost",
       result.cooling_cost,
+      "money",
     ],
 
     [
       "Margin",
       result.margin,
+      "money",
     ],
 
     [
       "Handling cost",
       result.handling_cost,
+      "money",
     ],
 
     [
       "Transport & packaging",
       result.transport_cost,
+      "money",
     ],
+    ["Final commercial markup", result.final_markup, "money"],
   ];
 
   const tbody =
@@ -1333,17 +1364,26 @@ async function renderResult(
 
   tbody.innerHTML = rows
     .map(
-      ([label, value], index) => `
+      ([label, value, type]) => `
         <tr>
           <th>${label}</th>
 
           <td class="num">
-            ${index >= 5 ? money(value) : fmt(value)}
+            ${
+              type === "money"
+                ? money(value)
+                : type === "text"
+                  ? WorkbookUI.escape(value || "—")
+                  : fmt(value)
+            }
           </td>
         </tr>
       `,
     )
     .join("");
+
+  renderToolingBlocks(result);
+  WorkbookUI.render(result);
 
   document.getElementById(
     "out-total",
@@ -1355,6 +1395,44 @@ async function renderResult(
   );
 }
 
+function renderToolingBlocks(result) {
+  document.getElementById("tooling-sizing-basis").textContent =
+    result.tooling_sizing_basis || "No sizing explanation available.";
+
+  const tbody = document.querySelector("#out-blocks tbody");
+  const blocks = result.tooling_blocks || [];
+
+  if (!blocks.length) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="5">No tooling block sizing available.</td>
+      </tr>
+    `;
+    return;
+  }
+
+  tbody.innerHTML = blocks
+    .map((block) => `
+      <tr>
+        <td>
+          <strong>${WorkbookUI.escape(block.component || "—")}</strong>
+          <span>${WorkbookUI.escape(block.assumption || "")}</span>
+        </td>
+        <td>${WorkbookUI.escape(block.role || "—")}</td>
+        <td class="num">${block.pieces ?? "—"}</td>
+        <td class="num">${WorkbookUI.escape(block.raw_stock || "—")}
+          <span>${block.finished_length_mm == null ? "" : "Finished envelope: " + (block.stock_form === "Round billet" ? "Diameter " : "") + [block.finished_length_mm, block.finished_width_mm, block.finished_height_mm].filter(v => v != null).map(v => fmt(v, 3)).join(" x ") + " mm"}</span>
+          <span>${block.cost_before_commercial == null ? (block.purchased ? "Quote required" : "") : money(block.cost_before_commercial) + " before commercial adjustments"}</span></td>
+        <td>
+          <strong>${WorkbookUI.escape(block.material_note || "—")}</strong>
+          <span>${WorkbookUI.escape(block.heating_cooling || "")}</span>
+          <span>${WorkbookUI.escape(block.costing_material || "")}</span>
+        </td>
+      </tr>
+    `)
+    .join("");
+}
+
 
 /* =========================================================
    Recommendation rendering
@@ -1364,13 +1442,13 @@ async function renderRecommendation(result) {
   document.getElementById("rec-material").textContent = result.recommended_material || "—";
   const confidence = result.recommendation_confidence || "unknown";
   const badge = document.getElementById("rec-confidence");
-  badge.textContent = `Confidence: ${sentenceCase(confidence)}`;
+  badge.textContent = confidence === "review_required" ? "Engineering review required" : `Confidence: ${sentenceCase(confidence)}`;
   badge.dataset.level = confidence;
   document.getElementById("confidence-explanation").textContent =
-    (confidence === "high"
+    result.recommendation_confidence_explanation || ((confidence === "high"
       ? "Your inputs trigger a specific selection rule for material durability, loading, corrosion, precision or finish. "
       : "This is a general recommendation for the selected production conditions. Exact grade and geometry may change the choice. ")
-    + (result.recommendation_reasons || []).map(sentenceCase).join(" ");
+    + (result.recommendation_reasons || []).map(sentenceCase).join(" "));
   const risks = document.getElementById("rec-failure-modes");
   risks.replaceChildren();
   const modes = result.failure_modes || [];
@@ -1548,7 +1626,12 @@ function setupTabs() {
 
 function setupEvents() {
   document.getElementById("calculate-btn").addEventListener("click", calculateAndRender);
-  document.getElementById("inp-process").addEventListener("change", updateWorkpieceMaterials);
+  document.getElementById("inp-process").addEventListener("change", () => {
+    currentToolingMaterialFamily = null;
+    currentToolingDefaults = null;
+    updateWorkpieceMaterials();
+    WorkbookUI.onProcessChange();
+  });
   document.getElementById("inp-cycles").addEventListener("change", syncExpectedCycles);
   document.getElementById("inp-country").addEventListener("change", async event => {
     try { await loadCountryDefaults(event.target.value); }
@@ -1571,6 +1654,11 @@ function setupEvents() {
     scheduleCalculation();
   });
   document.querySelectorAll("input, select").forEach(element => {
+    if (element.type === "number") {
+      element.step = "1";
+      // Zero-based steps keep native arrows on whole units; decimal typing stays supported.
+      if (Number(element.min) > 0 && Number(element.min) < 1) element.min = "0";
+    }
     const eventName = element.tagName === "SELECT" ? "change" : "input";
     element.addEventListener(eventName, () => {
       if (element.id === "inp-country") return;
@@ -1715,6 +1803,10 @@ async function init() {
       "DE",
     );
 
+    await WorkbookUI.init();
+    document.getElementById("inp-process").value = "die_casting";
+    WorkbookUI.onProcessChange();
+
 
     /* Events */
 
@@ -1819,6 +1911,7 @@ function updateCurrencyDisplay() {
   document.querySelector("#out-main tbody").replaceChildren();
   document.getElementById("freight-breakdown").textContent = "Recalculate to see freight in the selected currency.";
   updateCountryFlags();
+  WorkbookUI.refresh();
 }
 function applyCountryDefaults(profile) {
   applyCountryDefaultsRaw(profile);
@@ -1866,6 +1959,7 @@ function readState() {
     road_journeys: number("road-journeys"), sea_journeys: number("sea-journeys"),
     allocation: document.getElementById("freight-allocation").value
   };
+  WorkbookUI.addState(state);
   return state;
 }
 function validateLogistics(logistics) {

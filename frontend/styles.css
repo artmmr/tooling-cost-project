@@ -723,6 +723,35 @@ main {
   font-family: var(--mono);
 }
 
+.block-table {
+  min-width: 880px;
+  table-layout: fixed;
+}
+
+.block-table th:nth-child(1) { width: 220px; }
+.block-table th:nth-child(2) { width: 90px; }
+.block-table th:nth-child(3) { width: 60px; }
+.block-table th:nth-child(4) { width: 230px; }
+.block-table th:nth-child(5) { width: 280px; }
+
+.block-table th,
+.block-table td {
+  vertical-align: top;
+  padding-right: 12px;
+}
+
+.block-table td span {
+  display: block;
+  margin-top: 0.25rem;
+  color: var(--muted);
+  font-size: 0.73rem;
+  line-height: 1.4;
+}
+
+.block-table td.num {
+  white-space: nowrap;
+}
+
 .material-hero {
   margin: 1.2rem 0;
   padding: 1rem;
@@ -1056,3 +1085,32 @@ main {
 
 .recommendation-card .result-card-header { flex-wrap: wrap; }
 .summary-meta { white-space: normal; text-align: right; }
+.component-editor {
+  border-bottom: 1px solid var(--border, #41464d);
+  padding: 12px 0;
+}
+.component-editor summary {
+  cursor: pointer;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.component-editor summary .summary-meta {
+  display: inline-block;
+  margin-left: 8px;
+}
+.component-editor .field,
+.component-editor .form-grid {
+  min-width: 0;
+}
+.component-editor label { overflow-wrap: anywhere; }
+.component-editor h4 { margin: 20px 0 12px; }
+.component-editor select { width: 100%; }
+#workbook-results { margin-top: 20px; }
+#workbook-results .technical-details { margin-top: 20px; }
+#workbook-results .secondary-btn { margin-top: 20px; }
+.estimate-warning { color: #eabf58; font-weight: 600; }
+.estimate-warning:empty { display: none; }
+.sizing-glossary dt { font-weight: 600; margin-top: 12px; }
+.sizing-glossary dd { margin: 4px 0 12px; line-height: 1.5; }
+.block-table td, .block-table th { overflow-wrap: anywhere; white-space: normal; }
+[hidden] { display: none !important; }
