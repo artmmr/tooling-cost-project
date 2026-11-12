@@ -34,6 +34,7 @@
       <nav class="tabs" aria-label="Sections">
         <div class="tabs-inner">
           <button type="button" data-tab="calc" aria-selected="true">Overview</button>
+          <button type="button" data-tab="drawing" aria-selected="false">From drawing</button>
           <button type="button" data-tab="transport" aria-selected="false">Logistics</button>
         </div>
       </nav>
@@ -535,6 +536,157 @@
                 </div>
               </section>
             </aside>
+          </div>
+        </section>
+
+        <section id="panel-drawing" class="panel" aria-labelledby="drawing-heading">
+          <div class="drawing-shell">
+            <div class="section-intro">
+              <div>
+                <p class="eyebrow">Drawing to estimate</p>
+                <h2 id="drawing-heading">Estimate tooling cost from a part drawing</h2>
+              </div>
+              <span id="drawing-state" class="status-chip accent" aria-live="polite">No drawing</span>
+            </div>
+
+            <div class="drawing-grid">
+              <section class="input-card drawing-upload-card">
+                <div class="section-heading">
+                  <span class="step-number">01</span>
+                  <div>
+                    <h3>Upload drawing</h3>
+                    <p>PDF, PNG, JPG, WEBP, TIFF, BMP or GIF · up to 15 MB</p>
+                  </div>
+                </div>
+
+                <div id="drop-zone" class="drop-zone" role="button" tabindex="0" aria-describedby="drop-zone-hint">
+                  <svg class="drop-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4m0 0-4.5 4.5M12 4l4.5 4.5M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  <strong>Drop a drawing here</strong>
+                  <span>or <span class="link-like">browse your computer</span></span>
+                  <span id="drop-zone-hint" class="drop-hint">You can also paste a screenshot (Ctrl+V / ⌘V).</span>
+                </div>
+                <p id="drawing-upload-error" class="upload-error" role="alert" hidden></p>
+                <input id="drawing-file" type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.tif,.tiff,.bmp,.gif,application/pdf,image/*" hidden />
+
+                <div id="drawing-preview" class="drawing-preview" hidden>
+                  <div id="drawing-preview-frame" class="drawing-preview-frame"></div>
+                  <div class="drawing-file-row">
+                    <span id="drawing-file-name" class="drawing-file-name"></span>
+                    <button id="drawing-replace" type="button" class="secondary-btn">Upload another</button>
+                  </div>
+                </div>
+
+                <p class="field-help">The drawing is sent to the configured AI model for reading. CAD-exported PDFs give the most reliable result: their values are cross-checked against the text inside the PDF.</p>
+              </section>
+
+              <section class="input-card drawing-results-card">
+                <div class="section-heading">
+                  <span class="step-number">02</span>
+                  <div>
+                    <h3>Check recognized values</h3>
+                    <p>Overall part envelope in millimetres. Every value stays editable.</p>
+                  </div>
+                </div>
+
+                <div id="drawing-empty" class="drawing-empty">Upload a drawing to read its dimensions.</div>
+                <div id="drawing-loading" class="drawing-loading" hidden>
+                  <span class="spinner" aria-hidden="true"></span>
+                  <span id="drawing-loading-text">Reading drawing…</span>
+                </div>
+                <div id="drawing-error" class="drawing-error" role="alert" hidden></div>
+
+                <div id="drawing-fields" hidden>
+                  <p id="drawing-part-name" class="drawing-part-name"></p>
+                  <div class="drawing-dims">
+                    <div class="field">
+                      <label for="drawing-l">Length <span class="unit">mm</span></label>
+                      <input id="drawing-l" type="number" min="0" step="any" />
+                      <p id="drawing-l-source" class="dim-source"></p>
+                    </div>
+                    <div class="field">
+                      <label for="drawing-w">Width <span class="unit">mm</span></label>
+                      <input id="drawing-w" type="number" min="0" step="any" />
+                      <p id="drawing-w-source" class="dim-source"></p>
+                    </div>
+                    <div class="field">
+                      <label for="drawing-h">Height <span class="unit">mm</span></label>
+                      <input id="drawing-h" type="number" min="0" step="any" />
+                      <p id="drawing-h-source" class="dim-source"></p>
+                    </div>
+                  </div>
+                  <div class="form-grid two-col">
+                    <div class="field">
+                      <label for="drawing-t">Wall / material thickness <span class="unit">mm</span></label>
+                      <input id="drawing-t" type="number" min="0" step="any" />
+                      <p id="drawing-t-source" class="dim-source"></p>
+                    </div>
+                    <div class="field">
+                      <label for="drawing-material">Part material</label>
+                      <select id="drawing-material"></select>
+                      <p id="drawing-material-source" class="dim-source"></p>
+                    </div>
+                  </div>
+                  <ul id="drawing-warnings" class="drawing-warnings"></ul>
+                  <details class="technical-details drawing-all-dims">
+                    <summary id="drawing-all-dims-summary">All dimensions read</summary>
+                    <div class="details-body">
+                      <div class="table-wrap" role="region" aria-label="All dimensions read from the drawing" tabindex="0">
+                        <table class="outputs-table">
+                          <thead><tr><th>As printed</th><th>Unit</th><th>View</th><th>Measures</th><th>Check</th></tr></thead>
+                          <tbody id="drawing-all-dims"></tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </details>
+                  <p id="drawing-model" class="field-help"></p>
+                </div>
+              </section>
+            </div>
+
+            <section class="input-card drawing-cost-card">
+              <div class="section-heading">
+                <span class="step-number">03</span>
+                <div>
+                  <h3>Calculate tooling cost</h3>
+                  <p>These settings are shared with Overview, where all other assumptions can be edited.</p>
+                </div>
+              </div>
+              <div class="drawing-cost-grid">
+                <div class="form-grid two-col">
+                  <div class="field">
+                    <label for="drawing-country">Manufacturing country</label>
+                    <select id="drawing-country" data-mirror="inp-country"></select>
+                  </div>
+                  <div class="field">
+                    <label for="drawing-process">Manufacturing process</label>
+                    <select id="drawing-process" data-mirror="inp-process"></select>
+                  </div>
+                  <div class="field field-span-2">
+                    <label for="drawing-pqty" data-label-from="sets-label">Parts per mold / tool</label>
+                    <select id="drawing-pqty" data-mirror="inp-pqty"></select>
+                  </div>
+                  <div class="field">
+                    <label for="drawing-cycles" data-label-from="quantity-band-label">Tool life band</label>
+                    <select id="drawing-cycles" data-mirror="inp-cycles"></select>
+                  </div>
+                  <div class="field">
+                    <label for="drawing-expected" data-label-from="quantity-label">Expected production cycles</label>
+                    <input id="drawing-expected" type="number" min="1" step="1" data-mirror="inp-expected-cycles" />
+                  </div>
+                </div>
+                <div class="drawing-cost-result">
+                  <button id="drawing-calc-btn" type="button" class="calculate-btn" disabled>Use these values &amp; calculate</button>
+                  <p id="drawing-calc-status" class="field-help" aria-live="polite">Upload a drawing first.</p>
+                  <div id="drawing-cost" class="drawing-cost" hidden>
+                    <span class="eyebrow">Estimated tooling price</span>
+                    <div class="price-hero"><span id="drawing-cost-currency" class="currency">€</span><strong id="drawing-cost-total">—</strong></div>
+                    <p id="drawing-cost-detail" class="price-caption"></p>
+                    <p id="drawing-cost-scope" class="estimate-warning"></p>
+                    <button id="drawing-open-breakdown" type="button" class="secondary-btn">Open full breakdown</button>
+                  </div>
+                </div>
+              </div>
+            </section>
           </div>
         </section>
 

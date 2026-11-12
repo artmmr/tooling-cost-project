@@ -46,3 +46,11 @@ uvicorn==0.52.1
 uvloop==0.22.1
 watchfiles==1.2.0
 websockets==17.0.1
+pdfplumber==0.11.10
+pypdfium2==5.15.2
+pdfminer.six==20260107
+pillow==13.0.0
+cffi==2.1.1
+charset-normalizer==3.5.2
+cryptography==50.0.2
+pycparser==3.12

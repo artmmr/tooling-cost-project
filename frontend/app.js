@@ -1654,6 +1654,8 @@ function setupEvents() {
     scheduleCalculation();
   });
   document.querySelectorAll("input, select").forEach(element => {
+    // The drawing tab manages its own fields and forwards changes to Overview.
+    if (element.type === "file" || element.closest("#panel-drawing")) return;
     if (element.type === "number") {
       element.step = "1";
       // Zero-based steps keep native arrows on whole units; decimal typing stays supported.
@@ -1811,6 +1813,7 @@ async function init() {
     /* Events */
 
     setupEvents();
+    setupDrawingImport();
 
     setupTabs();
 
@@ -1980,6 +1983,334 @@ function restoreLogistics() {
   document.getElementById("sea-journeys").value = 2;
   document.getElementById("freight-allocation").value = "proportional";
 }
+/* =========================================================
+   From drawing tab: upload a drawing, review the envelope, calculate
+   ========================================================= */
+
+const DRAWING_EXTENSIONS = ["pdf", "png", "jpg", "jpeg", "webp", "tif", "tiff", "bmp", "gif"];
+const DRAWING_MAX_BYTES = 15 * 1024 * 1024;
+const DRAWING_CHECK_LABELS = {
+  in_text_layer: "found in PDF text",
+  not_in_text_layer: "not in PDF text: check",
+  no_text_layer: "not cross-checked",
+};
+const drawing = {request: null, result: null, previewUrl: null, timer: null, materialChoice: null};
+
+function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, char => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"})[char]);
+}
+
+function setDrawingState(text) {
+  document.getElementById("drawing-state").textContent = text;
+}
+
+function showDrawingSection(name) {
+  for (const id of ["drawing-empty", "drawing-loading", "drawing-error", "drawing-fields"]) {
+    document.getElementById(id).hidden = id !== `drawing-${name}`;
+  }
+}
+
+/* --- Settings shared with Overview -------------------------------- */
+
+function syncDrawingMirrors() {
+  document.querySelectorAll("#panel-drawing [data-mirror]").forEach(element => {
+    const source = document.getElementById(element.dataset.mirror);
+    if (element.tagName === "SELECT") element.innerHTML = source.innerHTML;
+    element.value = source.value;
+  });
+  document.querySelectorAll("#panel-drawing [data-label-from]").forEach(label => {
+    label.textContent = document.getElementById(label.dataset.labelFrom).textContent;
+  });
+  const material = document.getElementById("drawing-material");
+  const overviewMaterial = document.getElementById("inp-workpiece-material");
+  material.innerHTML = overviewMaterial.innerHTML;
+  const available = [...material.options].some(option => option.value === drawing.materialChoice);
+  material.value = available ? drawing.materialChoice : overviewMaterial.value;
+  updateDrawingMaterialSource();
+}
+
+function setupDrawingMirrors() {
+  document.querySelectorAll("#panel-drawing [data-mirror]").forEach(element => {
+    const source = document.getElementById(element.dataset.mirror);
+    const eventName = element.tagName === "SELECT" ? "change" : "input";
+    element.addEventListener(eventName, () => {
+      source.value = element.value;
+      source.dispatchEvent(new Event(eventName, {bubbles: true}));
+      // Process changes rebuild other Overview lists (quantity bands, materials).
+      syncDrawingMirrors();
+      setTimeout(syncDrawingMirrors, 0);
+      markDrawingCostStale();
+    });
+    source.addEventListener(eventName, () => setTimeout(syncDrawingMirrors, 0));
+  });
+  document.getElementById("inp-workpiece-material").addEventListener("change", () => setTimeout(syncDrawingMirrors, 0));
+  document.getElementById("drawing-material").addEventListener("change", event => {
+    drawing.materialChoice = event.target.value;
+    updateDrawingMaterialSource();
+    markDrawingCostStale();
+  });
+}
+
+/* --- Upload --------------------------------------------------------- */
+
+function drawingFileProblem(file) {
+  const extension = file.name.includes(".") ? file.name.split(".").pop().toLowerCase() : "";
+  const knownType = file.type === "application/pdf" || file.type.startsWith("image/");
+  if (!DRAWING_EXTENSIONS.includes(extension) && !knownType) {
+    return `"${file.name}" is not a supported drawing. Use PDF, PNG, JPG, WEBP, TIFF, BMP or GIF.`;
+  }
+  if (file.size > DRAWING_MAX_BYTES) return `"${file.name}" is larger than 15 MB.`;
+  if (file.size === 0) return `"${file.name}" is empty.`;
+  return null;
+}
+
+function showDrawingPreview(file) {
+  if (drawing.previewUrl) URL.revokeObjectURL(drawing.previewUrl);
+  drawing.previewUrl = URL.createObjectURL(file);
+  const frame = document.getElementById("drawing-preview-frame");
+  const isPdf = file.type === "application/pdf" || /\.pdf$/i.test(file.name);
+  const fallback = () => {
+    frame.innerHTML = `<p class="preview-fallback">Preview not available for this file type in your browser. It can still be read.</p>`;
+  };
+  if (isPdf) {
+    frame.innerHTML = `<iframe title="Drawing preview" src="${drawing.previewUrl}#toolbar=0&amp;view=Fit"></iframe>`;
+  } else {
+    const image = new Image();
+    image.alt = "Drawing preview";
+    image.onerror = fallback;
+    image.src = drawing.previewUrl;
+    frame.replaceChildren(image);
+  }
+  document.getElementById("drawing-file-name").textContent = `${file.name} · ${(file.size / 1024 / 1024).toFixed(2)} MB`;
+  document.getElementById("drawing-preview").hidden = false;
+  document.getElementById("drop-zone").classList.add("compact");
+}
+
+async function readDrawing(file) {
+  const uploadError = document.getElementById("drawing-upload-error");
+  const problem = drawingFileProblem(file);
+  // A rejected file leaves the current drawing and its values untouched.
+  uploadError.textContent = problem || "";
+  uploadError.hidden = !problem;
+  if (problem) return;
+  drawing.request?.abort();
+  const controller = new AbortController();
+  drawing.request = controller;
+  drawing.result = null;
+  showDrawingPreview(file);
+  showDrawingSection("loading");
+  setDrawingState("Reading…");
+  document.getElementById("drawing-calc-btn").disabled = true;
+  document.getElementById("drawing-cost").hidden = true;
+  document.getElementById("drawing-calc-status").textContent = "Waiting for the drawing to be read.";
+  const started = Date.now();
+  const loadingText = document.getElementById("drawing-loading-text");
+  const tick = () => {
+    loadingText.textContent = `Reading dimensions from ${file.name}… ${Math.round((Date.now() - started) / 1000)} s (usually 15–40 s)`;
+  };
+  tick();
+  clearInterval(drawing.timer);
+  drawing.timer = setInterval(tick, 1000);
+  try {
+    const form = new FormData();
+    form.append("file", file, file.name);
+    const response = await fetch(`${API_BASE_URL}/api/extract-dimensions`, {method: "POST", body: form, signal: controller.signal});
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      if (response.status === 404) throw new Error("This server does not support drawing import yet.");
+      throw new Error(typeof body.detail === "string" ? body.detail : `Request failed (${response.status}).`);
+    }
+    if (drawing.request !== controller) return;
+    drawing.result = body;
+    renderDrawingResult(body);
+  } catch (error) {
+    if (error.name === "AbortError" || drawing.request !== controller) return;
+    showDrawingSection("error");
+    document.getElementById("drawing-error").textContent = `Could not read the drawing: ${error.message}`;
+    setDrawingState("Failed");
+    document.getElementById("drawing-calc-status").textContent = "Upload a drawing first, or enter dimensions on Overview.";
+  } finally {
+    if (drawing.request === controller) {
+      drawing.request = null;
+      clearInterval(drawing.timer);
+    }
+  }
+}
+
+/* --- Review --------------------------------------------------------- */
+
+function dimensionSourceHtml(dimension, fallback) {
+  if (!dimension) return `<span class="missing">${fallback}</span>`;
+  const printed = dimension.unit === "inch" ? `${dimension.as_printed} in → ${fmt(dimension.value_mm, 2)} mm` : `${dimension.as_printed} mm`;
+  return `${escapeHtml(printed)} <span class="check-badge" data-check="${dimension.check}">${DRAWING_CHECK_LABELS[dimension.check]}</span>`
+    + (dimension.evidence ? `<span class="evidence">${escapeHtml(dimension.evidence)}</span>` : "");
+}
+
+function updateDrawingMaterialSource() {
+  const source = document.getElementById("drawing-material-source");
+  const material = drawing.result?.material;
+  if (!drawing.result) { source.textContent = ""; return; }
+  if (!material) { source.innerHTML = `<span class="missing">Not stated on the drawing. Choose it by hand.</span>`; return; }
+  const select = document.getElementById("drawing-material");
+  const matched = material.workpiece_material && select.value === material.workpiece_material;
+  source.innerHTML = `Drawing says <strong>${escapeHtml(material.as_printed)}</strong>`
+    + (matched ? "" : ` <span class="check-badge" data-check="not_in_text_layer">choose the closest option</span>`);
+}
+
+function renderDrawingResult(result) {
+  const round = value => Math.round(value * 100) / 100;
+  for (const [key, id] of [["length", "l"], ["width", "w"], ["height", "h"]]) {
+    document.getElementById(`drawing-${id}`).value = result[key] ? round(result[key].value_mm) : "";
+    document.getElementById(`drawing-${id}-source`).innerHTML = dimensionSourceHtml(result[key], "Not dimensioned on the drawing. Enter it by hand.");
+  }
+  const thickness = document.getElementById("drawing-t");
+  thickness.value = result.wall_thickness ? round(result.wall_thickness.value_mm) : document.getElementById("inp-material-thickness").value;
+  document.getElementById("drawing-t-source").innerHTML = dimensionSourceHtml(result.wall_thickness, "Not a thin-walled part on the drawing; current Overview value kept.");
+
+  drawing.materialChoice = result.material?.workpiece_material || null;
+  syncDrawingMirrors();
+
+  document.getElementById("drawing-part-name").textContent =
+    [result.part_name, result.shape !== "other" ? `${result.shape} part` : null].filter(Boolean).join(" · ");
+  document.getElementById("drawing-warnings").innerHTML = result.warnings.map(w => `<li>${escapeHtml(w)}</li>`).join("");
+  document.getElementById("drawing-all-dims-summary").textContent = `All dimensions read (${result.dimensions_read.length})`;
+  document.getElementById("drawing-all-dims").innerHTML = result.dimensions_read.map(d =>
+    `<tr><td class="mono">${escapeHtml(d.printed)}</td><td>${escapeHtml(d.unit)}</td><td>${escapeHtml(d.view)}</td>`
+    + `<td>${escapeHtml(d.measures)}</td><td><span class="check-badge" data-check="${d.check}">${DRAWING_CHECK_LABELS[d.check]}</span></td></tr>`
+  ).join("") || `<tr><td colspan="5">The model did not list individual dimensions.</td></tr>`;
+  document.getElementById("drawing-model").textContent =
+    `Read by ${result.model} from ${result.source_kind === "pdf" ? `a ${result.pages}-page PDF` : "an image"}. Check each value against the drawing before relying on the estimate.`;
+
+  showDrawingSection("fields");
+  const complete = Boolean(result.length && result.width && result.height);
+  setDrawingState(complete ? "Review values" : "Values missing");
+  document.getElementById("drawing-calc-btn").disabled = false;
+  document.getElementById("drawing-calc-status").textContent = complete
+    ? "Check the values, choose the process and quantity, then calculate."
+    : "Enter the missing dimensions, then calculate.";
+}
+
+function markDrawingCostStale() {
+  const cost = document.getElementById("drawing-cost");
+  if (!cost.hidden) {
+    cost.classList.add("stale");
+    document.getElementById("drawing-calc-status").textContent = "Values changed. Calculate again to update the price.";
+  }
+}
+
+/* --- Calculate ------------------------------------------------------ */
+
+function setOverviewField(id, value) {
+  const element = document.getElementById(id);
+  element.value = value;
+  element.dispatchEvent(new Event(element.tagName === "SELECT" ? "change" : "input", {bubbles: true}));
+}
+
+async function calculateFromDrawing() {
+  const status = document.getElementById("drawing-calc-status");
+  const values = {};
+  for (const [id, label] of [["l", "Length"], ["w", "Width"], ["h", "Height"], ["t", "Wall / material thickness"]]) {
+    const value = Number.parseFloat(document.getElementById(`drawing-${id}`).value);
+    if (!Number.isFinite(value) || value <= 0) {
+      status.textContent = `${label} must be greater than zero.`;
+      status.classList.add("err");
+      document.getElementById(`drawing-${id}`).focus();
+      return;
+    }
+    values[id] = value;
+  }
+  status.classList.remove("err");
+
+  // Drawing values describe a custom part, never the workbook's reference example.
+  const sizingMode = document.getElementById("inp-sizing-mode");
+  if (sizingMode.value === "reference") setOverviewField("inp-sizing-mode", "part_scaled");
+  setOverviewField("inp-l", values.l);
+  setOverviewField("inp-w", values.w);
+  setOverviewField("inp-h", values.h);
+  setOverviewField("inp-material-thickness", values.t);
+  const material = document.getElementById("drawing-material").value;
+  if (material) setOverviewField("inp-workpiece-material", material);
+
+  const button = document.getElementById("drawing-calc-btn");
+  button.disabled = true;
+  status.textContent = "Calculating…";
+  try {
+    await calculateAndRender();
+  } finally {
+    button.disabled = false;
+  }
+  const badge = document.getElementById("estimate-state");
+  const overviewStatus = document.getElementById("calc-status");
+  const cost = document.getElementById("drawing-cost");
+  if (badge.dataset.stale !== "false") {
+    status.textContent = overviewStatus.textContent || "The estimate could not be calculated.";
+    status.classList.toggle("err", overviewStatus.classList.contains("err"));
+    cost.hidden = true;
+    return;
+  }
+  document.getElementById("drawing-cost-currency").textContent = document.querySelector(".price-hero .currency").textContent;
+  document.getElementById("drawing-cost-total").textContent = document.getElementById("out-total").textContent;
+  document.getElementById("drawing-cost-detail").textContent =
+    `${fmt(values.l, 1)} × ${fmt(values.w, 1)} × ${fmt(values.h, 1)} mm · ${document.getElementById("inp-process").selectedOptions[0]?.textContent || ""} · Tooling material: ${document.getElementById("out-c12").textContent}`;
+  document.getElementById("drawing-cost-scope").textContent = document.getElementById("estimate-scope").textContent;
+  cost.classList.remove("stale");
+  cost.hidden = false;
+  setDrawingState("Estimated");
+  status.textContent = "Estimate updated. The full breakdown is on Overview.";
+}
+
+function setupDrawingImport() {
+  const input = document.getElementById("drawing-file");
+  const zone = document.getElementById("drop-zone");
+  const browse = () => input.click();
+  zone.addEventListener("click", browse);
+  zone.addEventListener("keydown", event => {
+    if (event.key === "Enter" || event.key === " ") { event.preventDefault(); browse(); }
+  });
+  document.getElementById("drawing-replace").addEventListener("click", browse);
+  input.addEventListener("change", () => {
+    const file = input.files[0];
+    input.value = "";
+    if (file) readDrawing(file);
+  });
+  let dragDepth = 0;
+  zone.addEventListener("dragenter", event => { event.preventDefault(); dragDepth++; zone.classList.add("dragging"); });
+  zone.addEventListener("dragover", event => { event.preventDefault(); event.dataTransfer.dropEffect = "copy"; });
+  zone.addEventListener("dragleave", () => { if (--dragDepth <= 0) { dragDepth = 0; zone.classList.remove("dragging"); } });
+  zone.addEventListener("drop", event => {
+    event.preventDefault();
+    dragDepth = 0;
+    zone.classList.remove("dragging");
+    const file = event.dataTransfer.files[0];
+    if (file) readDrawing(file);
+  });
+  // A file dropped anywhere else would make the browser navigate away and lose all inputs.
+  for (const type of ["dragover", "drop"]) {
+    window.addEventListener(type, event => {
+      if (event.dataTransfer?.types?.includes("Files") && !zone.contains(event.target)) event.preventDefault();
+    });
+  }
+  document.addEventListener("paste", event => {
+    if (!document.getElementById("panel-drawing").classList.contains("active")) return;
+    const item = [...(event.clipboardData?.items || [])].find(entry => entry.kind === "file");
+    const file = item?.getAsFile();
+    if (!file) return;
+    event.preventDefault();
+    const extension = (file.type.split("/")[1] || "png").replace("jpeg", "jpg");
+    readDrawing(file.name && file.name !== "image.png" ? file : new File([file], `pasted-drawing.${extension}`, {type: file.type}));
+  });
+  for (const id of ["drawing-l", "drawing-w", "drawing-h", "drawing-t"]) {
+    document.getElementById(id).addEventListener("input", markDrawingCostStale);
+  }
+  document.getElementById("drawing-calc-btn").addEventListener("click", calculateFromDrawing);
+  document.getElementById("drawing-open-breakdown").addEventListener("click", () => {
+    document.querySelector('nav.tabs button[data-tab="calc"]').click();
+    document.getElementById("price-heading").scrollIntoView({behavior: "smooth", block: "start"});
+  });
+  document.querySelector('nav.tabs button[data-tab="drawing"]').addEventListener("click", syncDrawingMirrors);
+  setupDrawingMirrors();
+}
+
 function markStale(message = "Estimate out of date") {
   const badge = document.getElementById("estimate-state");
   badge.textContent = message;

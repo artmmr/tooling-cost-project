@@ -1,10 +1,17 @@
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi.concurrency import run_in_threadpool
 
 from app.country_profiles import COUNTRY_PROFILES
 from app.tooling_materials import TOOLING_MATERIALS
 
 from app.calculator import calculate
+from app.drawing_extraction import (
+    DrawingExtractionError,
+    DrawingExtractionResponse,
+    VisionUnavailableError,
+    extract_dimensions,
+)
 from app.models import CalculationRequest, CalculationResponse
 from app.reference_data import load_reference_summary
 from app.tooling_catalog import public_catalog
@@ -54,6 +61,24 @@ def calculate_tooling(
         return calculate(request)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.post(
+    "/api/extract-dimensions",
+    response_model=DrawingExtractionResponse,
+)
+async def extract_drawing_dimensions(
+    file: UploadFile = File(...),
+) -> DrawingExtractionResponse:
+    pdf_bytes = await file.read()
+    try:
+        return await run_in_threadpool(
+            extract_dimensions, pdf_bytes, file.filename or "drawing.pdf"
+        )
+    except DrawingExtractionError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except VisionUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
 @app.get("/api/countries")
