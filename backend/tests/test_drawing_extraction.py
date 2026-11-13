@@ -122,7 +122,7 @@ class ImageInputTests(unittest.TestCase):
 
     def test_image_upload_flow(self):
         with mock.patch.object(de, "_ask_model", return_value=reading()):
-            result = de.extract_dimensions(image_bytes("JPEG"), "photo.jpg", de.VisionSettings("u", "m", 1))
+            result = de.extract_dimensions(image_bytes("JPEG"), "photo.jpg", de.VisionSettings("u", "m", 1, provider="ollama"))
         self.assertEqual(result.source_kind, "image")
         self.assertEqual(result.length.check, "no_text_layer")
         self.assertTrue(any("Image upload" in w for w in result.warnings))
@@ -172,6 +172,9 @@ class OpenAIProviderTests(unittest.TestCase):
         with mock.patch.dict(os.environ, {"VISION_PROVIDER": "openai", "OPENAI_API_KEY": "k"}, clear=False):
             settings = de.VisionSettings.from_env()
         self.assertEqual((settings.provider, settings.model, settings.api_key), ("openai", "gpt-6-luna", "k"))
+        env = {k: v for k, v in os.environ.items() if k not in ("VISION_PROVIDER", "VISION_MODEL", "VISION_API_URL")}
+        with mock.patch.dict(os.environ, env, clear=True):
+            self.assertEqual(de.VisionSettings.from_env().provider, "openai")
         with mock.patch.dict(os.environ, {"VISION_PROVIDER": "nope"}):
             with self.assertRaises(de.VisionUnavailableError):
                 de.VisionSettings.from_env()
@@ -190,7 +193,7 @@ class EndpointTests(unittest.TestCase):
 
     @unittest.skipUnless((BLUEPRINTS / "A1220.pdf").exists(), "sample drawings not present")
     def test_model_unreachable_is_503(self):
-        settings = de.VisionSettings(url="http://127.0.0.1:9", model="x", timeout_s=2)
+        settings = de.VisionSettings(url="http://127.0.0.1:9", model="x", timeout_s=2, provider="ollama")
         with mock.patch.object(de.VisionSettings, "from_env", return_value=settings):
             response = self.client.post("/api/extract-dimensions",
                                         files={"file": ("A1220.pdf", (BLUEPRINTS / "A1220.pdf").read_bytes(), "application/pdf")})

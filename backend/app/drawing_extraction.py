@@ -6,8 +6,8 @@ Two independent sources are combined:
    It is exact but has no meaning attached: it cannot tell a bore from an outside
    diameter. Image uploads (PNG, JPG, scans...) have no text layer.
 2. A vision-language model that looks at the rendered sheet and decides which
-   numbers are the overall extents: OpenAI (``VISION_PROVIDER=openai``) or a
-   local Ollama model (the default).
+   numbers are the overall extents: OpenAI (the default) or a local Ollama
+   model (``VISION_PROVIDER=ollama``, offline fallback only).
 
 Every value the model returns is checked against the text layer when there is
 one. The result is only a suggestion: the user confirms it before it is used.
@@ -52,12 +52,12 @@ class VisionSettings:
     url: str
     model: str
     timeout_s: float
-    provider: Literal["ollama", "openai"] = "ollama"
+    provider: Literal["ollama", "openai"] = "openai"
     api_key: str | None = None
 
     @classmethod
     def from_env(cls) -> "VisionSettings":
-        provider = os.environ.get("VISION_PROVIDER", "ollama").strip().lower()
+        provider = os.environ.get("VISION_PROVIDER", "openai").strip().lower()
         if provider == "openai":
             return cls(
                 provider="openai",
@@ -69,6 +69,7 @@ class VisionSettings:
         if provider != "ollama":
             raise VisionUnavailableError(f"Unknown VISION_PROVIDER '{provider}'. Use 'ollama' or 'openai'.")
         return cls(
+            provider="ollama",
             url=os.environ.get("VISION_API_URL", "http://localhost:11434").rstrip("/"),
             model=os.environ.get("VISION_MODEL", "qwen3-vl:8b-instruct"),
             timeout_s=float(os.environ.get("VISION_TIMEOUT_S", "300")),
@@ -358,7 +359,7 @@ def _post_json(url: str, body: dict, headers: dict, settings: VisionSettings) ->
 
 def _ask_openai(images: list[str], settings: VisionSettings) -> ModelReading:
     if not settings.api_key:
-        raise VisionUnavailableError("OPENAI_API_KEY is not set.")
+        raise VisionUnavailableError("OPENAI_API_KEY is not set on the server. Add it to the backend environment variables.")
     content = [{"type": "input_text", "text": ENVELOPE_PROMPT}] + [
         {"type": "input_image", "image_url": f"data:image/png;base64,{image}", "detail": "high"}
         for image in images
