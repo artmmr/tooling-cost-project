@@ -227,7 +227,7 @@ def calculate_workbook(request):
         standard_parts_note=level["standard_parts_note"], assembly_tryout_cost=level["assembly_tryout_cost"], energy_cost=energy,
         road_transport_cost=road, sea_transport_cost=sea, transport_cost=road + sea, final_markup=0,
         total_price=subtotal, recommended_material=grade["candidates"],
-        recommended_material_family=profiles_used[0], recommendation_confidence="review_required",
+        recommended_material_family=profiles_used[0], costing_material_family=profiles_used[0], recommendation_confidence="review_required",
         recommendation_confidence_explanation="The process and quantity match a workbook rule. Geometry, pressure, temperature, grade suitability and tool life have not been validated by these planning values.",
         failure_modes=["dimensional drift", "surface degradation", "high mechanical loading"],
         recommendation_reasons=reasons,

@@ -122,3 +122,24 @@ class CostBehaviourTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ForcedMaterialTests(unittest.TestCase):
+    def test_broad_process_can_be_priced_in_another_material(self):
+        base = calculate(legacy("plastic_injection", "standard_thermoplastic"))
+        forced = calculate(legacy("plastic_injection", "standard_thermoplastic",
+                                  tooling_material_family="aluminum_tooling", force_tooling_material=True))
+        self.assertEqual(base.costing_material_family, "pre_hardened_mold_steel")
+        self.assertEqual(forced.costing_material_family, "aluminum_tooling")
+        self.assertEqual(forced.recommended_material_family, "pre_hardened_mold_steel")
+        self.assertLess(forced.total_price, base.total_price)
+        report = build_report(legacy("plastic_injection", "standard_thermoplastic",
+                                     tooling_material_family="aluminum_tooling", force_tooling_material=True))
+        current = next(o for o in report.material_options if o.is_current)
+        self.assertEqual(current.family, "aluminum_tooling")
+        self.assertEqual(report.tool_life.life, 50_000)
+
+    def test_unknown_forced_family_is_rejected(self):
+        with self.assertRaises(ValueError):
+            calculate(legacy("plastic_injection", "standard_thermoplastic", tooling_material_family="unobtainium",
+                             force_tooling_material=True))

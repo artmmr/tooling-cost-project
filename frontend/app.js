@@ -320,6 +320,13 @@ function updateThicknessField() {
    Cycle band → suggested expected cycles
    ========================================================= */
 
+/* The quantity band is derived from the quantity; it is no longer a separate input. */
+function syncLegacyBand() {
+  if (WorkbookUI.current()) return;
+  const quantity = Number(document.getElementById("inp-expected-cycles").value);
+  if (Number.isInteger(quantity) && quantity > 0) document.getElementById("inp-cycles").value = legacyBandFor(quantity);
+}
+
 function syncExpectedCycles() {
   if (WorkbookUI.chooseBand()) return;
   const cycleBand =
@@ -1165,10 +1172,10 @@ async function renderResult(
   renderToolingBlocks(result);
   WorkbookUI.render(result);
 
-  document.getElementById(
-    "out-total",
-  ).textContent =
-    fmt(result.total_price * currencyFactor());
+  // Whole currency units: cents would be false precision for an estimate.
+  document.getElementById("out-total").textContent = fmt(result.total_price * currencyFactor(), 0);
+  document.getElementById("out-range").textContent =
+    `Likely range ${money0(result.total_price * 0.8)} – ${money0(result.total_price * 1.3)}`;
 
   await renderRecommendation(
     result,
@@ -1230,19 +1237,19 @@ async function renderRecommendation(result) {
       : "This is a general recommendation for the selected production conditions. Exact grade and geometry may change the choice. ")
     + (result.recommendation_reasons || []).map(sentenceCase).join(" "));
   const risks = document.getElementById("rec-failure-modes");
-  risks.replaceChildren();
+  if (risks) risks.replaceChildren();
   const modes = result.failure_modes || [];
   if (!modes.length) {
     const li = document.createElement("li");
     li.textContent = "No specific elevated risk was identified by these rules. This does not mean production is risk-free.";
-    risks.append(li);
+    risks?.append(li);
   }
   modes.forEach(mode => {
     const li = document.createElement("li");
     const strong = document.createElement("strong");
     strong.textContent = `${sentenceCase(mode)}: `;
     li.append(strong, document.createTextNode(RISK_HELP[mode] || "Review this risk against your tooling design and production conditions."));
-    risks.append(li);
+    risks?.append(li);
   });
   renderList("rec-reasons", result.recommendation_reasons, "No selection reasons available.");
   renderList("rec-operations", result.recommended_operations, "No tooling manufacturing route available.");
@@ -1310,7 +1317,13 @@ async function calculateAndRender() {
     if (countryLoading) throw new Error("Wait for country defaults to finish loading.");
     if (!currentCountryDefaults || currentCountryDefaults.code !== document.getElementById("inp-country").value)
       throw new Error("Country defaults are unavailable. Select the country again.");
-    if (!currencyFactor()) throw new Error("Enter a positive EUR/USD exchange rate and its date before calculating in USD.");
+    if (!currencyFactor()) {
+      // Point the visitor at the field: open Assumptions on the currency section.
+      document.getElementById("assumptions").open = true;
+      throw new Error(ecbRate
+        ? "Enter a positive EUR/USD exchange rate and its date (Assumptions → Currency) to calculate in USD."
+        : "The exchange rate could not be loaded. Enter a EUR/USD rate and its date under Assumptions → Currency to calculate in USD.");
+    }
     const state = readState();
     validateState(state);
     validateLogistics(state.logistics);
@@ -1319,24 +1332,26 @@ async function calculateAndRender() {
     setStatus("Updating estimate…");
     const {result, report} = await ReportUI.request(state, controller.signal);
     if (revision !== inputRevision) return;
-    const familyChanged = currentToolingMaterialFamily !== result.recommended_material_family;
+    const targetFamily = forcedFamily || result.recommended_material_family;
+    const familyChanged = currentToolingMaterialFamily !== targetFamily;
     const hadFamily = Boolean(currentToolingMaterialFamily);
     let profile;
     if (familyChanged) {
-      const response = await fetch(`${API_BASE_URL}/api/tooling-materials/${result.recommended_material_family}`, {signal: controller.signal});
+      const response = await fetch(`${API_BASE_URL}/api/tooling-materials/${targetFamily}`, {signal: controller.signal});
       if (!response.ok) throw new Error("Could not load the recommended tooling defaults.");
       profile = await response.json();
     }
     if (revision !== inputRevision) return;
     if (profile) {
       currentToolingDefaults = profile;
-      currentToolingMaterialFamily = result.recommended_material_family;
+      currentToolingMaterialFamily = targetFamily;
       applyToolingMaterialDefaults(profile);
     }
     await renderResult(result);
     if (revision !== inputRevision) return;
     ReportUI.render(report, state);
     hasCalculated = true;
+    AdvancedUI.onResult(result, report, state);
     const badge = document.getElementById("estimate-state");
     badge.textContent = "Up to date";
     badge.dataset.stale = "false";
@@ -1410,10 +1425,13 @@ function setupEvents() {
   document.getElementById("inp-process").addEventListener("change", () => {
     currentToolingMaterialFamily = null;
     currentToolingDefaults = null;
+    forcedFamily = null;
     updateWorkpieceMaterials();
     WorkbookUI.onProcessChange();
+    syncLegacyBand();
   });
   document.getElementById("inp-cycles").addEventListener("change", syncExpectedCycles);
+  document.getElementById("inp-expected-cycles").addEventListener("input", syncLegacyBand);
   document.getElementById("inp-country").addEventListener("change", async event => {
     try { await loadCountryDefaults(event.target.value); }
     catch (error) { setStatus(error.message, true); }
@@ -1616,8 +1634,11 @@ async function init() {
     setupTabs();
 
     // A link from the quick-price page carries the part and calculates straight away.
+    AdvancedUI.init();
+    // Results first: calculate the default (or linked) part straight away.
     if (!(await ReportUI.applyUrlPrefill())) {
       setStatus("Ready to calculate.");
+      await calculateAndRender();
     }
   } catch (error) {
     console.error(
@@ -1653,6 +1674,8 @@ const canonicalMoney = {"road-rate": 1400 / 250, "sea-rate": 8000 / 19800 * 1.85
 let displayCurrency = "EUR", countryCurrency = "EUR", shownFactor = 1;
 // ECB reference rate loaded from the API; the visitor may override it with their own agreed rate.
 let ecbRate = null, ecbRequest = null, fxEdited = false;
+// Tooling family chosen with "Try this material" on a broad-process estimate.
+let forcedFamily = null;
 let hasCalculated = false, calculationTimer, inputRevision = 0, activeCalculation;
 let countryRevision = 0, countryLoading = false;
 const RISK_HELP = {
@@ -1678,6 +1701,10 @@ function currencyFactor() {
   if (displayCurrency === "EUR") return 1;
   const rate = Number(document.getElementById("inp-fx").value);
   return Number.isFinite(rate) && rate > 0 && document.getElementById("inp-fx-date").value ? rate : null;
+}
+function money0(euros) {
+  const factor = currencyFactor();
+  return factor && Number.isFinite(euros) ? `${displayCurrency === "EUR" ? "€" : "$"}${fmt(euros * factor, 0)}` : "—";
 }
 function money(euros) {
   const factor = currencyFactor();
@@ -1799,6 +1826,10 @@ function readState() {
   };
   const detail = document.getElementById("inp-material-detail").value;
   if (detail) state.part_material_detail = detail;
+  if (forcedFamily && !WorkbookUI.current()) {
+    state.tooling_material_family = forcedFamily;
+    state.force_tooling_material = true;
+  }
   const eurToUsd = Number(document.getElementById("inp-fx").value);
   if (Number.isFinite(eurToUsd) && eurToUsd > 0) state.eur_to_usd = eurToUsd;
   WorkbookUI.addState(state);
@@ -2148,6 +2179,7 @@ function setupDrawingImport() {
 
 function markStale(message = "Estimate out of date") {
   ReportUI.markStale();
+  AdvancedUI.onStale(message);
   const badge = document.getElementById("estimate-state");
   badge.textContent = message;
   badge.dataset.stale = "true";

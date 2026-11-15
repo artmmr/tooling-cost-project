@@ -31,6 +31,7 @@ const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
     }
     browser = await chromium.launch({headless: true});
     const context = await browser.newContext({viewport: {width: 1440, height: 1000}, colorScheme: 'light'});
+    await context.grantPermissions(['clipboard-read', 'clipboard-write'], {origin: url});
     const page = await context.newPage();
     page.on('pageerror', error => failures.push(error.message));
     const summaryCalls = [];
@@ -126,7 +127,10 @@ const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
       assert.equal(await text('#report-state'), 'Up to date');
       assert.match(await text('#rk-price'), /^€[\d,]+$/);
       assert.match(await text('#rk-per-part-note'), /150,000 parts/);
-      assert(await page.locator('#rp-drivers .bar-row').count() >= 3);
+      assert(await page.locator('#rp-drivers .stack-seg').count() >= 3);
+      assert.equal(await page.locator('#rp-drivers .stack-seg').count(), await page.locator('#rp-drivers .legend-table tr').count());
+      assert.equal(await page.locator('#rp-quantity-chart .pt').count(), 6);
+      assert.equal(await page.locator('#rp-quantity-chart .pt.current').count(), 1);
       assert.equal(await page.locator('#rp-quantity tr').count(), 6);
       assert.equal(await page.locator('#rp-quantity tr.current').count(), 1);
       assert(await page.locator('#rp-materials .option-card').count() >= 2);
@@ -209,7 +213,8 @@ const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
       await fresh.addInitScript(base => globalThis.TOOLING_API_BASE_URL = base, url);
       await fresh.route('**/api/fx/eur-usd', route => route.fulfill({status: 503, json: {detail: 'The European Central Bank exchange rate could not be loaded.'}}));
       await fresh.goto(`${url}/advanced.html`);
-      await fresh.waitForFunction(() => document.getElementById('calc-status').textContent === 'Ready to calculate.');
+      await fresh.waitForFunction(() => document.getElementById('estimate-state').dataset.stale === 'false');
+      await fresh.evaluate(() => { document.getElementById('assumptions').open = true; });
       assert.equal(await fresh.locator('#inp-fx').inputValue(), '');
       await fresh.locator('#inp-country').selectOption('IN');
       await fresh.waitForFunction(() => document.getElementById('calc-status').textContent.includes('could not be loaded'));
@@ -259,6 +264,97 @@ const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
       await page.locator('#inp-process').selectOption('plastic_injection');
       await page.locator('#inp-material-detail').selectOption('pvc_corrosive_thermoplastic');
       assert.equal(await page.locator('#inp-workpiece-material').inputValue(), 'corrosive_polymer');
+    });
+
+    await check('Summary bar, presets, Try this with Undo, assumptions, link and history', async () => {
+      await page.setViewportSize({width: 1440, height: 1000});
+      await page.goto(`${url}/advanced.html`);
+      await page.waitForFunction(() => document.getElementById('estimate-state').dataset.stale === 'false');
+      // Results first: calculated on load, summary bar visible, no cents in the price.
+      assert.equal(await page.locator('#summary-bar').isVisible(), true);
+      assert.match(await text('#sb-price'), /^€[\d,]+$/);
+      assert.match(await text('#out-total'), /^[\d,]+$/);
+      assert.match(await text('#out-range'), /^Likely range €[\d,]+ – €[\d,]+$/);
+      // Quantity presets; the band follows the quantity.
+      await page.locator('.presets [data-qty="100000"]').click();
+      assert.equal(await page.locator('#inp-expected-cycles').inputValue(), '100000');
+      await page.waitForFunction(() => document.getElementById('sb-state').dataset.stale === 'false'
+        && document.getElementById('rk-per-part-note').textContent.includes('100,000'));
+      // Assumptions: collapsed by default with a one-line summary and an edited count.
+      assert.equal(await page.locator('.input-column #assumptions').count(), 1, 'assumptions belong to the inputs');
+      assert.equal(await page.locator('#report #assumptions').count(), 0);
+      assert.equal(await page.locator('#assumptions').getAttribute('open'), null);
+      assert.match(await text('#assumptions-summary'), /Germany rates · EUR/);
+      assert.equal(await page.locator('#assumptions-edited').isHidden(), true);
+      await page.locator('#assumptions > summary').click();
+      await page.locator('#inp-cnc3-rate').fill('150');
+      await page.waitForFunction(() => !document.getElementById('assumptions-edited').hidden);
+      assert.equal(await text('#assumptions-edited'), '1 edited');
+      await page.locator('#reset-country-defaults').click();
+      await page.waitForFunction(() => document.getElementById('assumptions-edited').hidden);
+      await page.waitForFunction(() => document.getElementById('sb-state').dataset.stale === 'false');
+      // Try another country, then undo.
+      const before = await text('#sb-price');
+      await page.locator('#rp-countries [data-try-value="PL"]').click();
+      await page.waitForFunction(() => !document.getElementById('sb-change').hidden);
+      assert.equal(await page.locator('#inp-country').inputValue(), 'PL');
+      assert.match(await text('#sb-change-text'), /^Country: Poland: €[\d,]+ → €[\d,]+$/);
+      await page.locator('#sb-undo').click();
+      await page.waitForFunction(() => document.getElementById('inp-country').value === 'DE'
+        && document.getElementById('sb-state').dataset.stale === 'false');
+      assert.equal(await text('#sb-price'), before);
+      // Try another tooling material and another process; the part stays the same.
+      const length = await page.locator('#inp-l').inputValue();
+      await page.locator('#rp-materials .try-btn').first().click();
+      await page.waitForFunction(() => !document.getElementById('sb-change').hidden);
+      assert.match(await text('#sb-change-text'), /^Tool steel: /);
+      await page.locator('#sb-undo').click();
+      await page.waitForFunction(() => document.getElementById('sb-change').hidden && document.getElementById('sb-state').dataset.stale === 'false');
+      const processTry = page.locator('#rp-processes .try-btn').first();
+      const target = await processTry.getAttribute('data-try-value');
+      await processTry.click();
+      await page.waitForFunction(t => document.getElementById('inp-process').value === t
+        && !document.getElementById('sb-change').hidden, target);
+      assert.equal(await page.locator('#inp-l').inputValue(), length);
+      await page.locator('#sb-undo').click();
+      await page.waitForFunction(() => document.getElementById('inp-process').value === 'die_casting'
+        && document.getElementById('sb-state').dataset.stale === 'false');
+      // Copy link and history.
+      await page.locator('#sb-copy').click();
+      const copied = await page.evaluate(() => navigator.clipboard.readText());
+      const params = new URL(copied).searchParams;
+      assert.equal(params.get('process'), 'die_casting');
+      assert.equal(params.get('qty'), '100000');
+      await page.locator('#sb-history').click();
+      assert(await page.locator('#history-panel li').count() >= 2);
+      await page.keyboard.press('Escape');
+      assert.equal(await page.locator('#history-panel').isHidden(), true);
+      // Report navigation jumps to a section.
+      await page.locator('#report-nav a[href="#rs-sourcing"]').click();
+      await page.waitForFunction(() => document.querySelector('#report-nav a[aria-current]')?.getAttribute('href') === '#rs-sourcing');
+      // Print layout shows the report and hides the form.
+      await page.emulateMedia({media: 'print'});
+      assert.equal(await page.locator('.input-column').isVisible(), false);
+      assert.equal(await page.locator('#rs-materials').isVisible(), true);
+      await page.emulateMedia({media: 'screen'});
+      if (shots) await page.screenshot({path: path.join(shots, 'redesign-desktop.png')});
+    });
+
+    await check('Phone layout: bottom price bar and collapsible report cards', async () => {
+      await page.setViewportSize({width: 390, height: 844});
+      await page.goto(`${url}/advanced.html`);
+      await page.waitForFunction(() => document.getElementById('estimate-state').dataset.stale === 'false');
+      const bar = await page.locator('#summary-bar').boundingBox();
+      assert(bar.y + bar.height >= 844 - 2, 'summary bar sits at the bottom');
+      const card = page.locator('#rs-materials');
+      assert.equal(await card.evaluate(el => el.classList.contains('collapsed')), true);
+      assert.equal(await page.locator('#rp-materials').isVisible(), false);
+      await card.locator('.collapse-toggle').click();
+      assert.equal(await page.locator('#rp-materials').isVisible(), true);
+      const height = await page.evaluate(() => document.documentElement.scrollHeight);
+      assert(height < 844 * 12, `phone page is ${(height / 844).toFixed(1)} screens`);
+      console.log(`      phone page: ${(height / 844).toFixed(1)} screens`);
+      if (shots) await page.screenshot({path: path.join(shots, 'redesign-phone.png'), fullPage: false});
     });
 
     await check('Dark theme and mobile layouts have no sideways scrolling', async () => {
