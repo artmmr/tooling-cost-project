@@ -17,6 +17,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import threading
 import time
 import urllib.error
@@ -87,7 +88,8 @@ def _settings() -> dict:
         "api_key": os.environ.get("OPENAI_API_KEY"),
         "timeout_s": float(os.environ.get("SUMMARY_TIMEOUT_S", "60")),
         "max_output_tokens": int(os.environ.get("SUMMARY_MAX_OUTPUT_TOKENS", "900")),
-        "reasoning": os.environ.get("SUMMARY_REASONING_EFFORT", "minimal").strip(),
+        # "none" skips reasoning tokens entirely: the summary only rewrites computed facts.
+        "reasoning": os.environ.get("SUMMARY_REASONING_EFFORT", "none").strip(),
         "per_client_hour": int(os.environ.get("SUMMARY_LIMIT_PER_HOUR", "12")),
         "per_day": int(os.environ.get("SUMMARY_LIMIT_PER_DAY", "300")),
     }
@@ -205,6 +207,17 @@ def _post(settings: dict, body: dict) -> dict:
         raise SummaryUnavailableError("The AI summary service returned an unreadable reply.") from exc
 
 
+EFFORT_PREFERENCE = ("none", "minimal", "low")
+
+
+def cheapest_supported_effort(message: str) -> str | None:
+    """Lowest reasoning effort named in an API error such as "Supported values are: 'none', 'low'..."."""
+    if "supported values" not in message.lower():
+        return None
+    listed = set(re.findall(r"'([a-z]+)'", message.split("upported values", 1)[1]))
+    return next((effort for effort in EFFORT_PREFERENCE if effort in listed), None)
+
+
 def _ask_model(facts: dict, settings: dict) -> Summary:
     if not settings["api_key"]:
         raise SummaryUnavailableError("OPENAI_API_KEY is not set on the server.")
@@ -222,10 +235,15 @@ def _ask_model(facts: dict, settings: dict) -> Summary:
     try:
         payload = _post(settings, body)
     except SummaryUnavailableError as exc:
-        # Models without reasoning controls reject the field; retry once without it.
-        if "reasoning" not in body or "reasoning" not in str(exc).lower():
+        # A model may reject the effort value (or the field). Retry once with the cheapest
+        # value it lists as supported, or without the field.
+        if "reasoning" not in body or "(400)" not in str(exc):
             raise
-        body.pop("reasoning")
+        fallback = cheapest_supported_effort(str(exc))
+        if fallback:
+            body["reasoning"] = {"effort": fallback}
+        else:
+            body.pop("reasoning")
         payload = _post(settings, body)
     texts = [
         part.get("text", "")

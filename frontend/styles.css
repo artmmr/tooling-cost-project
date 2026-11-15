@@ -867,7 +867,13 @@ main {
   line-height: 1.4;
 }
 
+/* Raw stock: the stock size stays on one line; the envelope and cost lines wrap inside the column. */
 .block-table td.num {
+  text-align: left;
+  white-space: normal;
+}
+
+.block-table td.num .stock-size {
   white-space: nowrap;
 }
 
@@ -1576,3 +1582,4 @@ main {
 .matrix-card .result-card-header, .report-intro { flex-wrap: wrap; gap: 0.6rem; }
 .compare-table th .current-tag { display: inline-block; margin-top: 0.2rem; }
 .life-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 0.6rem 0; } .compare-table td.num span { display: block; color: var(--muted); font-size: 0.7rem; } @media (max-width: 720px) { .life-kpis { grid-template-columns: 1fr; } }
+.block-table td.num .stock-size { font-weight: 500; }

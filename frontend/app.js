@@ -1200,9 +1200,9 @@ function renderToolingBlocks(result) {
         </td>
         <td>${WorkbookUI.escape(block.role || "—")}</td>
         <td class="num">${block.pieces ?? "—"}</td>
-        <td class="num">${WorkbookUI.escape(block.raw_stock || "—")}
-          <span>${block.finished_length_mm == null ? "" : "Finished envelope: " + (block.stock_form === "Round billet" ? "Diameter " : "") + [block.finished_length_mm, block.finished_width_mm, block.finished_height_mm].filter(v => v != null).map(v => fmt(v, 3)).join(" x ") + " mm"}</span>
-          <span>${block.cost_before_commercial == null ? (block.purchased ? "Quote required" : "") : money(block.cost_before_commercial) + " before commercial adjustments"}</span></td>
+        <td class="num"><strong class="stock-size">${WorkbookUI.escape(block.raw_stock || "—")}</strong>
+          <span>${block.finished_length_mm == null ? "" : "Finished envelope: " + (block.stock_form === "Round billet" ? "Diameter " : "") + [block.finished_length_mm, block.finished_width_mm, block.finished_height_mm].filter(v => v != null).map(v => fmt(v, 1)).join(" x ") + " mm"}</span>
+          <span>${block.cost_before_commercial == null ? (block.purchased ? "Quote required" : "") : money(block.cost_before_commercial) + " before overhead and margin"}</span></td>
         <td>
           <strong>${WorkbookUI.escape(block.material_note || "—")}</strong>
           <span>${WorkbookUI.escape(block.heating_cooling || "")}</span>
