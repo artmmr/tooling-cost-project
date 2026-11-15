@@ -1,0 +1,1051 @@
+{
+ "schema_version": 1,
+ "source": {
+  "filename": "Industrialisation_Process_Tooling_Matrix_EN.xlsx",
+  "sha256": "2febca3ec9c2b8f278882940e00a38d235e50ff6cdb9501514b57bc794b5d43e"
+ },
+ "bands": [
+  {
+   "band": "1–20",
+   "quantity_min": 1,
+   "quantity_max": 20
+  },
+  {
+   "band": "21–100",
+   "quantity_min": 21,
+   "quantity_max": 100
+  },
+  {
+   "band": "101–1,000",
+   "quantity_min": 101,
+   "quantity_max": 1000
+  },
+  {
+   "band": "1,001–10,000",
+   "quantity_min": 1001,
+   "quantity_max": 10000
+  },
+  {
+   "band": "10,001–100,000",
+   "quantity_min": 10001,
+   "quantity_max": 100000
+  },
+  {
+   "band": "Above 100,000",
+   "quantity_min": 100001,
+   "quantity_max": null
+  }
+ ],
+ "rows": [
+  {
+   "id": "carbon_steel_sheet_metal",
+   "material": "Carbon steel",
+   "form": "Sheet metal",
+   "bands": [
+    {
+     "route": "Laser cutting + bending",
+     "tooling": "no hard tooling / jig"
+    },
+    {
+     "route": "Laser cutting + bending",
+     "tooling": "mild-steel jig"
+    },
+    {
+     "route": "Laser cutting + bending / soft tool",
+     "tooling": "C45"
+    },
+    {
+     "route": "Simple stamping",
+     "tooling": "D2 / 1.2379 locally"
+    },
+    {
+     "route": "Progressive stamping",
+     "tooling": "hardened D2 / 1.2379"
+    },
+    {
+     "route": "Progressive stamping",
+     "tooling": "PM tool steel / local carbide"
+    }
+   ],
+   "comment": "Tool hardness increases with production rate, thickness and sheet strength.",
+   "source_row": 2
+  },
+  {
+   "id": "carbon_steel_solid",
+   "material": "Carbon steel",
+   "form": "Solid",
+   "bands": [
+    {
+     "route": "CNC / metal 3D printing",
+     "tooling": "no dedicated tooling"
+    },
+    {
+     "route": "CNC",
+     "tooling": "no dedicated tooling"
+    },
+    {
+     "route": "CNC",
+     "tooling": "C45 fixtures"
+    },
+    {
+     "route": "CNC / forging",
+     "tooling": "H11/H13"
+    },
+    {
+     "route": "Forging",
+     "tooling": "hardened H13"
+    },
+    {
+     "route": "High-volume forging",
+     "tooling": "premium H13 / PM inserts"
+    }
+   ],
+   "comment": "Forging becomes preferable when tooling cost can be amortized over the volume.",
+   "source_row": 3
+  },
+  {
+   "id": "stainless_steel_sheet_metal",
+   "material": "Stainless steel",
+   "form": "Sheet metal",
+   "bands": [
+    {
+     "route": "Laser cutting + bending",
+     "tooling": "no hard tooling"
+    },
+    {
+     "route": "Laser cutting + bending",
+     "tooling": "C45"
+    },
+    {
+     "route": "Laser / soft tool",
+     "tooling": "local D2"
+    },
+    {
+     "route": "Stamping",
+     "tooling": "hardened D2"
+    },
+    {
+     "route": "Progressive stamping",
+     "tooling": "D2 / PM tool steel"
+    },
+    {
+     "route": "Progressive stamping",
+     "tooling": "PM tool steel / carbide"
+    }
+   ],
+   "comment": "Stainless is more abrasive: higher hardness and wear resistance are required.",
+   "source_row": 4
+  },
+  {
+   "id": "stainless_steel_solid",
+   "material": "Stainless steel",
+   "form": "Solid",
+   "bands": [
+    {
+     "route": "CNC / metal 3D printing",
+     "tooling": "no dedicated tooling"
+    },
+    {
+     "route": "CNC",
+     "tooling": "no dedicated tooling"
+    },
+    {
+     "route": "CNC",
+     "tooling": "steel fixtures"
+    },
+    {
+     "route": "CNC / investment casting",
+     "tooling": "H13 for permanent mold"
+    },
+    {
+     "route": "Forging / casting",
+     "tooling": "H13"
+    },
+    {
+     "route": "High-volume forging",
+     "tooling": "premium H13 / PM inserts"
+    }
+   ],
+   "comment": "Choose machining, casting or forging according to geometry and required properties.",
+   "source_row": 5
+  },
+  {
+   "id": "aluminium_complex_part",
+   "material": "Aluminium",
+   "form": "Complex part",
+   "bands": [
+    {
+     "route": "CNC / metal 3D printing",
+     "tooling": "no dedicated tooling"
+    },
+    {
+     "route": "CNC / metal 3D printing",
+     "tooling": "no dedicated tooling"
+    },
+    {
+     "route": "CNC / prototype mold",
+     "tooling": "Aluminium 7075"
+    },
+    {
+     "route": "Gravity casting / low-pressure casting",
+     "tooling": "H13 or mold steel"
+    },
+    {
+     "route": "HPDC",
+     "tooling": "H13 / 1.2344"
+    },
+    {
+     "route": "High-volume HPDC",
+     "tooling": "premium H13 / ESR"
+    }
+   ],
+   "comment": "For medium to high volumes, die casting becomes very competitive.",
+   "source_row": 6
+  },
+  {
+   "id": "aluminium_profile",
+   "material": "Aluminium",
+   "form": "Profile",
+   "bands": [
+    {
+     "route": "CNC",
+     "tooling": "no dedicated tooling"
+    },
+    {
+     "route": "CNC",
+     "tooling": "no dedicated tooling"
+    },
+    {
+     "route": "CNC / small-batch extrusion",
+     "tooling": "H13"
+    },
+    {
+     "route": "Extrusion",
+     "tooling": "H13"
+    },
+    {
+     "route": "Extrusion",
+     "tooling": "hardened H13"
+    },
+    {
+     "route": "High-volume extrusion",
+     "tooling": "premium H13"
+    }
+   ],
+   "comment": "Extrusion for constant cross-sections; otherwise CNC/casting.",
+   "source_row": 7
+  },
+  {
+   "id": "magnesium_complex_part",
+   "material": "Magnesium",
+   "form": "Complex part",
+   "bands": [
+    {
+     "route": "CNC / metal 3D printing",
+     "tooling": "no dedicated tooling"
+    },
+    {
+     "route": "CNC",
+     "tooling": "no dedicated tooling"
+    },
+    {
+     "route": "CNC / prototype casting",
+     "tooling": "Aluminium 7075"
+    },
+    {
+     "route": "Casting",
+     "tooling": "H13"
+    },
+    {
+     "route": "HPDC",
+     "tooling": "H13 / 1.2344"
+    },
+    {
+     "route": "High-volume HPDC",
+     "tooling": "premium H13 / ESR"
+    }
+   ],
+   "comment": "Highly suitable for HPDC once volumes become significant.",
+   "source_row": 8
+  },
+  {
+   "id": "copper_sheet_metal",
+   "material": "Copper",
+   "form": "Sheet metal",
+   "bands": [
+    {
+     "route": "Laser / CNC",
+     "tooling": "no dedicated tooling"
+    },
+    {
+     "route": "Laser / CNC",
+     "tooling": "C45"
+    },
+    {
+     "route": "Cutting / soft tool",
+     "tooling": "local D2"
+    },
+    {
+     "route": "Stamping",
+     "tooling": "D2"
+    },
+    {
+     "route": "Progressive stamping",
+     "tooling": "hardened D2"
+    },
+    {
+     "route": "Progressive stamping",
+     "tooling": "D2 / PM tool steel"
+    }
+   ],
+   "comment": "Copper is soft but adhesive; pay attention to galling and wear.",
+   "source_row": 9
+  },
+  {
+   "id": "copper_solid",
+   "material": "Copper",
+   "form": "Solid",
+   "bands": [
+    {
+     "route": "CNC / metal 3D printing",
+     "tooling": "no dedicated tooling"
+    },
+    {
+     "route": "CNC",
+     "tooling": "no dedicated tooling"
+    },
+    {
+     "route": "CNC",
+     "tooling": "steel fixtures"
+    },
+    {
+     "route": "Forging",
+     "tooling": "H13"
+    },
+    {
+     "route": "Forging",
+     "tooling": "hardened H13"
+    },
+    {
+     "route": "High-volume forging",
+     "tooling": "premium H13"
+    }
+   ],
+   "comment": "Forging when geometry and mechanical properties allow it.",
+   "source_row": 10
+  },
+  {
+   "id": "silver_part_jewelry_contact",
+   "material": "Silver",
+   "form": "Part / jewelry / contact",
+   "bands": [
+    {
+     "route": "Metal 3D printing / CNC / lost wax",
+     "tooling": "no tooling"
+    },
+    {
+     "route": "Lost wax / CNC",
+     "tooling": "no tooling"
+    },
+    {
+     "route": "Casting / stamping",
+     "tooling": "local D2"
+    },
+    {
+     "route": "Stamping",
+     "tooling": "D2"
+    },
+    {
+     "route": "Stamping",
+     "tooling": "hardened D2"
+    },
+    {
+     "route": "High-volume stamping",
+     "tooling": "PM tool steel"
+    }
+   ],
+   "comment": "Expensive metal: prioritize processes that minimize material loss.",
+   "source_row": 11
+  },
+  {
+   "id": "gold_part_jewelry_contact",
+   "material": "Gold",
+   "form": "Part / jewelry / contact",
+   "bands": [
+    {
+     "route": "Metal 3D printing / CNC / lost wax",
+     "tooling": "no tooling"
+    },
+    {
+     "route": "Lost wax / CNC",
+     "tooling": "no tooling"
+    },
+    {
+     "route": "Casting / stamping",
+     "tooling": "local D2"
+    },
+    {
+     "route": "Stamping",
+     "tooling": "D2"
+    },
+    {
+     "route": "Stamping",
+     "tooling": "hardened D2"
+    },
+    {
+     "route": "High-volume stamping",
+     "tooling": "PM tool steel"
+    }
+   ],
+   "comment": "Expensive metal: material yield and scrap recovery are priorities.",
+   "source_row": 12
+  },
+  {
+   "id": "pp_pe_thermoplastic",
+   "material": "PP / PE",
+   "form": "Thermoplastic",
+   "bands": [
+    {
+     "route": "3D prototype / CNC",
+     "tooling": "printed or Al mold"
+    },
+    {
+     "route": "3D / CNC",
+     "tooling": "Aluminium 7075"
+    },
+    {
+     "route": "Prototype mold",
+     "tooling": "Aluminium 7075 / P20"
+    },
+    {
+     "route": "Injection molding",
+     "tooling": "P20 / 1.2311"
+    },
+    {
+     "route": "Injection molding",
+     "tooling": "1.2738 / 1.2083 depending on requirements"
+    },
+    {
+     "route": "High-volume injection",
+     "tooling": "hardened 1.2083 / H13 inserts"
+    }
+   ],
+   "comment": "Volume, fillers and texture determine final tooling hardness.",
+   "source_row": 13
+  },
+  {
+   "id": "abs_thermoplastic",
+   "material": "ABS",
+   "form": "Thermoplastic",
+   "bands": [
+    {
+     "route": "FDM/MJF/SLS",
+     "tooling": "no mold"
+    },
+    {
+     "route": "MJF/SLS",
+     "tooling": "no mold"
+    },
+    {
+     "route": "MJF/SLS or soft mold",
+     "tooling": "Aluminium 7075 / P20"
+    },
+    {
+     "route": "Injection molding",
+     "tooling": "P20 / 1.2311"
+    },
+    {
+     "route": "Injection molding",
+     "tooling": "1.2738"
+    },
+    {
+     "route": "High-volume injection",
+     "tooling": "1.2083 / H13 inserts"
+    }
+   ],
+   "comment": "3D printing is highly relevant for low volumes before mold amortization.",
+   "source_row": 14
+  },
+  {
+   "id": "pa_nylon_thermoplastic",
+   "material": "PA / Nylon",
+   "form": "Thermoplastic",
+   "bands": [
+    {
+     "route": "SLS/MJF",
+     "tooling": "no mold"
+    },
+    {
+     "route": "SLS/MJF",
+     "tooling": "no mold"
+    },
+    {
+     "route": "SLS/MJF or injection",
+     "tooling": "P20"
+    },
+    {
+     "route": "Injection molding",
+     "tooling": "P20 / 1.2311"
+    },
+    {
+     "route": "Injection molding",
+     "tooling": "1.2738 / H13 if filled"
+    },
+    {
+     "route": "High-volume injection",
+     "tooling": "H13 / PM inserts if glass-filled"
+    }
+   ],
+   "comment": "Glass-filled PA is highly abrasive and may require hard tooling.",
+   "source_row": 15
+  },
+  {
+   "id": "pom_thermoplastic",
+   "material": "POM",
+   "form": "Thermoplastic",
+   "bands": [
+    {
+     "route": "CNC",
+     "tooling": "no mold"
+    },
+    {
+     "route": "CNC",
+     "tooling": "no mold"
+    },
+    {
+     "route": "CNC / soft mold",
+     "tooling": "Aluminium 7075 / P20"
+    },
+    {
+     "route": "Injection molding",
+     "tooling": "P20"
+    },
+    {
+     "route": "Injection molding",
+     "tooling": "1.2738"
+    },
+    {
+     "route": "High-volume injection",
+     "tooling": "hardened 1.2083"
+    }
+   ],
+   "comment": "Good machinability at low volume; injection molding for series production.",
+   "source_row": 16
+  },
+  {
+   "id": "pc_thermoplastic",
+   "material": "PC",
+   "form": "Thermoplastic",
+   "bands": [
+    {
+     "route": "3D / CNC",
+     "tooling": "no mold"
+    },
+    {
+     "route": "3D / CNC",
+     "tooling": "no mold"
+    },
+    {
+     "route": "CNC / soft mold",
+     "tooling": "Aluminium 7075 / P20"
+    },
+    {
+     "route": "Injection molding",
+     "tooling": "P20"
+    },
+    {
+     "route": "Injection molding",
+     "tooling": "1.2738 / 1.2083"
+    },
+    {
+     "route": "High-volume injection",
+     "tooling": "hardened 1.2083"
+    }
+   ],
+   "comment": "Polishing and surface-quality requirements may justify more premium steels.",
+   "source_row": 17
+  },
+  {
+   "id": "pvc_corrosive_thermoplastic",
+   "material": "PVC",
+   "form": "Corrosive thermoplastic",
+   "bands": [
+    {
+     "route": "CNC / 3D prototype",
+     "tooling": "no mold"
+    },
+    {
+     "route": "CNC",
+     "tooling": "no mold"
+    },
+    {
+     "route": "Soft mold",
+     "tooling": "1.2083 / 420"
+    },
+    {
+     "route": "Injection molding / extrusion",
+     "tooling": "1.2083"
+    },
+    {
+     "route": "Injection molding / extrusion",
+     "tooling": "hardened 1.2083"
+    },
+    {
+     "route": "High volume",
+     "tooling": "1.2083 ESR / stainless mold steel"
+    }
+   ],
+   "comment": "PVC can be corrosive: favor corrosion-resistant mold steel.",
+   "source_row": 18
+  },
+  {
+   "id": "epdm_elastomer",
+   "material": "EPDM",
+   "form": "Elastomer",
+   "bands": [
+    {
+     "route": "3D mold + casting",
+     "tooling": "resin/Al"
+    },
+    {
+     "route": "Prototype mold",
+     "tooling": "Aluminium 7075"
+    },
+    {
+     "route": "Compression molding",
+     "tooling": "P20"
+    },
+    {
+     "route": "Compression / injection",
+     "tooling": "P20 / 1.2311"
+    },
+    {
+     "route": "Injection/compression",
+     "tooling": "1.2738"
+    },
+    {
+     "route": "High volume",
+     "tooling": "1.2083 / H13 depending on temperature"
+    }
+   ],
+   "comment": "Tooling evolves toward hardened steel as cycle count and temperature increase.",
+   "source_row": 19
+  },
+  {
+   "id": "silicone_lsr_elastomer",
+   "material": "Silicone / LSR",
+   "form": "Elastomer",
+   "bands": [
+    {
+     "route": "3D mold + casting",
+     "tooling": "resin/Al"
+    },
+    {
+     "route": "Prototype mold",
+     "tooling": "Aluminium 7075"
+    },
+    {
+     "route": "Compression / prototype LSR",
+     "tooling": "P20"
+    },
+    {
+     "route": "LSR injection",
+     "tooling": "P20 / 1.2311"
+    },
+    {
+     "route": "LSR injection",
+     "tooling": "1.2083"
+    },
+    {
+     "route": "High-volume LSR",
+     "tooling": "hardened 1.2083 / ESR"
+    }
+   ],
+   "comment": "Surface finish, precision and service life determine the grade.",
+   "source_row": 20
+  },
+  {
+   "id": "pu_epoxy_resin_thermoset",
+   "material": "PU / Epoxy resin",
+   "form": "Thermoset",
+   "bands": [
+    {
+     "route": "3D mold / casting",
+     "tooling": "tooling resin"
+    },
+    {
+     "route": "Casting",
+     "tooling": "tooling resin / Al"
+    },
+    {
+     "route": "Casting",
+     "tooling": "Aluminium 7075"
+    },
+    {
+     "route": "RTM / compression",
+     "tooling": "Aluminium 7075 / P20"
+    },
+    {
+     "route": "Compression / RTM",
+     "tooling": "P20 / 1.2311"
+    },
+    {
+     "route": "High volume",
+     "tooling": "1.2738 / 1.2083"
+    }
+   ],
+   "comment": "Aluminium is economical up to intermediate production volumes.",
+   "source_row": 21
+  },
+  {
+   "id": "zinc_die_casting",
+   "material": "Zinc",
+   "form": "Die casting",
+   "bands": [
+    {
+     "route": "CNC / metal 3D printing",
+     "tooling": "no tooling"
+    },
+    {
+     "route": "CNC",
+     "tooling": "no tooling"
+    },
+    {
+     "route": "CNC / prototype casting",
+     "tooling": "Aluminium 7075"
+    },
+    {
+     "route": "Die casting",
+     "tooling": "H13"
+    },
+    {
+     "route": "HPDC",
+     "tooling": "H13"
+    },
+    {
+     "route": "High-volume HPDC",
+     "tooling": "premium H13 / ESR"
+    }
+   ],
+   "comment": "Highly suitable for small complex parts at high production rates.",
+   "source_row": 22
+  },
+  {
+   "id": "titanium_solid",
+   "material": "Titanium",
+   "form": "Solid",
+   "bands": [
+    {
+     "route": "CNC / metal 3D printing",
+     "tooling": "no tooling"
+    },
+    {
+     "route": "CNC / metal 3D printing",
+     "tooling": "no tooling"
+    },
+    {
+     "route": "CNC",
+     "tooling": "steel fixtures"
+    },
+    {
+     "route": "CNC / forging",
+     "tooling": "H13"
+    },
+    {
+     "route": "Forging",
+     "tooling": "premium H13"
+    },
+    {
+     "route": "High-volume forging",
+     "tooling": "premium H13 / PM inserts"
+    }
+   ],
+   "comment": "High material cost; near-net-shape manufacturing can be decisive.",
+   "source_row": 23
+  },
+  {
+   "id": "brass_sheet_solid",
+   "material": "Brass",
+   "form": "Sheet / solid",
+   "bands": [
+    {
+     "route": "CNC / cutting",
+     "tooling": "no tooling"
+    },
+    {
+     "route": "CNC",
+     "tooling": "C45"
+    },
+    {
+     "route": "CNC / stamping",
+     "tooling": "local D2"
+    },
+    {
+     "route": "Stamping / forging",
+     "tooling": "D2 / H13"
+    },
+    {
+     "route": "Progressive stamping",
+     "tooling": "hardened D2"
+    },
+    {
+     "route": "High volume",
+     "tooling": "PM tool steel / H13 depending on process"
+    }
+   ],
+   "comment": "Use D2 for cold work and H13 for hot forging.",
+   "source_row": 24
+  }
+ ],
+ "grades": [
+  {
+   "name": "Tooling resin",
+   "typical_use": "Prototype mold, very low-volume casting",
+   "hardness": "No heat treatment",
+   "index_split": {
+    "steel": 0.0,
+    "aluminium": 0.0,
+    "copper": 0.0,
+    "nickel": 0.0,
+    "molybdenum": 0.0,
+    "tungsten": 0.0,
+    "other": 1.0
+   },
+   "note": "No direct metal index; link instead to resin/energy indices."
+  },
+  {
+   "name": "Aluminium 7075",
+   "typical_use": "Prototype mold / soft tooling",
+   "hardness": "Typical T6",
+   "index_split": {
+    "steel": 0.0,
+    "aluminium": 0.9,
+    "copper": 0.016,
+    "nickel": 0.0,
+    "molybdenum": 0.0,
+    "tungsten": 0.0,
+    "other": 0.084
+   },
+   "note": "Al dominant; Zn/Mg/Cr included in Other."
+  },
+  {
+   "name": "C45 / mild steel",
+   "typical_use": "Jigs, plates, soft tooling",
+   "hardness": "Normalized / local hardening possible",
+   "index_split": {
+    "steel": 0.985,
+    "aluminium": 0.0,
+    "copper": 0.0,
+    "nickel": 0.0,
+    "molybdenum": 0.0,
+    "tungsten": 0.0,
+    "other": 0.015
+   },
+   "note": "Proxy overwhelmingly driven by Steel."
+  },
+  {
+   "name": "P20 / 1.2311",
+   "typical_use": "Medium-series plastic molds",
+   "hardness": "Pre-hardened ~28–34 HRC",
+   "index_split": {
+    "steel": 0.975,
+    "aluminium": 0.0,
+    "copper": 0.0,
+    "nickel": 0.0,
+    "molybdenum": 0.002,
+    "tungsten": 0.0,
+    "other": 0.023
+   },
+   "note": "Cr/Mn/Si/C included in Other; Mo tracked separately."
+  },
+  {
+   "name": "1.2738 / P20 + Ni",
+   "typical_use": "Medium/high-series plastic molds",
+   "hardness": "Pre-hardened ~30–38 HRC",
+   "index_split": {
+    "steel": 0.965,
+    "aluminium": 0.0,
+    "copper": 0.0,
+    "nickel": 0.01,
+    "molybdenum": 0.002,
+    "tungsten": 0.0,
+    "other": 0.023
+   },
+   "note": "Ni tracked separately; other alloying elements included in Other."
+  },
+  {
+   "name": "1.2083 / 420",
+   "typical_use": "Corrosive-service / long-life plastic molds",
+   "hardness": "Hardened ~48–54 HRC",
+   "index_split": {
+    "steel": 0.865,
+    "aluminium": 0.0,
+    "copper": 0.0,
+    "nickel": 0.0,
+    "molybdenum": 0.005,
+    "tungsten": 0.0,
+    "other": 0.13
+   },
+   "note": "High chromium content included in Other because no dedicated Cr index is used."
+  },
+  {
+   "name": "H11 / 1.2343",
+   "typical_use": "Forging / die casting / extrusion",
+   "hardness": "Hardened ~44–52 HRC",
+   "index_split": {
+    "steel": 0.935,
+    "aluminium": 0.0,
+    "copper": 0.0,
+    "nickel": 0.0,
+    "molybdenum": 0.013,
+    "tungsten": 0.0,
+    "other": 0.052
+   },
+   "note": "Cr/V/Si/C included in Other; Mo tracked separately."
+  },
+  {
+   "name": "H13 / 1.2344",
+   "typical_use": "Die casting, extrusion, forging, inserts",
+   "hardness": "Hardened ~44–54 HRC",
+   "index_split": {
+    "steel": 0.936,
+    "aluminium": 0.0,
+    "copper": 0.0,
+    "nickel": 0.0,
+    "molybdenum": 0.013,
+    "tungsten": 0.0,
+    "other": 0.051
+   },
+   "note": "Cr/V/Si/C included in Other; Mo tracked separately."
+  },
+  {
+   "name": "D2 / 1.2379",
+   "typical_use": "Cutting, stamping, punches/dies",
+   "hardness": "Hardened ~56–62 HRC",
+   "index_split": {
+    "steel": 0.84,
+    "aluminium": 0.0,
+    "copper": 0.0,
+    "nickel": 0.0,
+    "molybdenum": 0.009,
+    "tungsten": 0.0,
+    "other": 0.151
+   },
+   "note": "High Cr (~12%) plus V/C included in Other."
+  },
+  {
+   "name": "PM Tool Steel",
+   "typical_use": "Very high volume / severe abrasion",
+   "hardness": "Hardened ~58–64 HRC",
+   "index_split": {
+    "steel": 0.79,
+    "aluminium": 0.0,
+    "copper": 0.0,
+    "nickel": 0.0,
+    "molybdenum": 0.05,
+    "tungsten": 0.05,
+    "other": 0.11
+   },
+   "note": "Generic PM proxy; replace with the exact grade when known."
+  },
+  {
+   "name": "WC-Co Carbide",
+   "typical_use": "Extreme-wear inserts / very high volume",
+   "hardness": "Sintered carbide",
+   "index_split": {
+    "steel": 0.0,
+    "aluminium": 0.0,
+    "copper": 0.0,
+    "nickel": 0.0,
+    "molybdenum": 0.0,
+    "tungsten": 0.9,
+    "other": 0.1
+   },
+   "note": "W index dominates; cobalt included in Other."
+  },
+  {
+   "name": "Premium H13 / ESR",
+   "typical_use": "Very high-volume HPDC/forging",
+   "hardness": "Hardened + ESR / premium quality",
+   "index_split": {
+    "steel": 0.936,
+    "aluminium": 0.0,
+    "copper": 0.0,
+    "nickel": 0.0,
+    "molybdenum": 0.013,
+    "tungsten": 0.0,
+    "other": 0.051
+   },
+   "note": "Same base chemistry as H13; premium mainly comes from process/quality."
+  },
+  {
+   "name": "1.2083 ESR",
+   "typical_use": "High-volume plastic / corrosive / optical",
+   "hardness": "Hardened + ESR",
+   "index_split": {
+    "steel": 0.865,
+    "aluminium": 0.0,
+    "copper": 0.0,
+    "nickel": 0.0,
+    "molybdenum": 0.005,
+    "tungsten": 0.0,
+    "other": 0.13
+   },
+   "note": "Same chemistry logic as 1.2083; premium cost is not captured by raw-material indices alone."
+  }
+ ],
+ "index_basket": {
+  "Steel / HRC": {
+   "weight": 0.45,
+   "sources": [
+    "https://www.lme.com/en/metals/ferrous/lme-steel-hrc-nw-europe-argus",
+    "https://tradingeconomics.com/commodity/steel",
+    "https://www.barchart.com/futures/quotes/E-G26/price-history"
+   ]
+  },
+  "Aluminium": {
+   "weight": 0.15,
+   "sources": [
+    "https://www.lme.com/en/metals/non-ferrous/lme-aluminium",
+    "https://tradingeconomics.com/commodity/aluminum",
+    "https://www.investing.com/commodities/aluminum-historical-data"
+   ]
+  },
+  "Copper": {
+   "weight": 0.1,
+   "sources": [
+    "https://www.lme.com/en/metals/non-ferrous/lme-copper",
+    "https://tradingeconomics.com/commodity/copper",
+    "https://www.macrotrends.net/1476/copper-prices-historical-chart-data"
+   ]
+  },
+  "Nickel": {
+   "weight": 0.15,
+   "sources": [
+    "https://www.lme.com/en/metals/non-ferrous/lme-nickel",
+    "https://tradingeconomics.com/commodity/nickel",
+    "https://www.barchart.com/futures/metals"
+   ]
+  },
+  "Molybdenum": {
+   "weight": 0.08,
+   "sources": [
+    "https://data.metal.com/item/molybdenum/price/price",
+    "https://tradingeconomics.com/commodity/molybden",
+    "https://www.lme.com/market-data/reports-and-data/historical-data-for-cash-settled-futures"
+   ]
+  },
+  "Tungsten": {
+   "weight": 0.05,
+   "sources": [
+    "https://data.metal.com/item/tungsten",
+    "https://data.metal.com/dataapi/tungsten/w_1_tungsten_bar",
+    "https://tradingeconomics.com/commodities"
+   ]
+  },
+  "Other": {
+   "weight": 0.02,
+   "sources": []
+  }
+ }
+}

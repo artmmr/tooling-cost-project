@@ -34,7 +34,8 @@ class LogisticsTests(unittest.TestCase):
         base = calculate(example())
         changed = calculate(example(logistics={'road_rate_eur_per_km':11.2}))
         self.assertAlmostEqual(changed.road_transport_cost, 2 * base.road_transport_cost)
-        self.assertAlmostEqual(changed.total_price - base.total_price, base.road_transport_cost * 1.1)
+        # Freight is passed through at cost: overhead and margin apply to the tool, not to transport.
+        self.assertAlmostEqual(changed.total_price - base.total_price, base.road_transport_cost)
 
     def test_whole_loads_and_zero_distance(self):
         result = calculate(example(logistics={'allocation':'whole_load'}))
@@ -65,7 +66,9 @@ class LogisticsTests(unittest.TestCase):
         self.assertEqual(result.tooling_quantity_band, 'Above 100,000')
         self.assertIn('progressive die', result.tooling_concept.lower())
         self.assertGreater(result.tooling_weight_kg, 0)
-        self.assertAlmostEqual(result.final_markup, result.total_price / 11)
+        self.assertEqual(result.final_markup, 0)
+        self.assertGreater(result.design_cost, 0)
+        self.assertGreater(result.construction_cost, 0)
         self.assertTrue(result.recommendation_confidence_explanation)
         self.assertGreaterEqual(len(result.tooling_blocks), 2)
         self.assertTrue(all(block.raw_stock for block in result.tooling_blocks))

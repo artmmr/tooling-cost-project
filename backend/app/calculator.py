@@ -29,30 +29,29 @@ def calculate_cooling_cost(
     tooling_weight_kg: float,
     includes_cooling: bool,
 ) -> float:
+    """Temperature-control channels, plugs and connectors for the working blocks.
+
+    Large tools keep the original benchmark tiers. Small tools scale with weight
+    (about 15 EUR/kg, at least 800 EUR for a drilled circuit): a flat 5,000 EUR
+    for a 10 kg insert set would exceed the cost of the inserts themselves.
+    These are planning benchmarks to validate against tooling quotations.
+    """
     if not includes_cooling:
         return 0.0
 
-    # Current benchmark ranges.
-    #
-    # These should eventually be validated
-    # against real tooling quotations.
-
     if tooling_weight_kg < 500:
-        return 5000.0
+        tier = 5000.0
+    elif tooling_weight_kg < 1000:
+        tier = 7500.0
+    elif tooling_weight_kg < 2000:
+        tier = 10000.0
+    elif tooling_weight_kg < 3000:
+        tier = 15000.0
+    else:
+        # Previously 0 above 50 t, which made the largest tools cheaper to cool.
+        tier = 20000.0
 
-    if tooling_weight_kg < 1000:
-        return 7500.0
-
-    if tooling_weight_kg < 2000:
-        return 10000.0
-
-    if tooling_weight_kg < 3000:
-        return 15000.0
-
-    if tooling_weight_kg < 50_000:
-        return 20000.0
-
-    return 0.0
+    return max(800.0, min(tier, 15.0 * tooling_weight_kg))
 
 
 # =========================================================
@@ -95,7 +94,14 @@ def validate_route(
 
 def calculate(
     request: CalculationRequest,
+    force_material_family: str | None = None,
 ) -> CalculationResponse:
+    """Price the tooling for one request.
+
+    ``force_material_family`` is used by the advanced report to price the
+    same broad-process tool in another tooling material. It is not part of
+    the public request contract.
+    """
 
     from app.tooling_catalog import is_workbook_process
     if is_workbook_process(request.process.value):
@@ -113,7 +119,8 @@ def calculate(
     )
 
     recommended_family = (
-        recommendation.material_family
+        force_material_family
+        or recommendation.material_family
     )
 
     if (
@@ -568,50 +575,44 @@ def calculate(
 
 
     # ---------------------------------------------------------
-    # 20. Base manufacturing cost
+    # 20. Complete tool: construction, design, base, tryout, energy
     # ---------------------------------------------------------
+
+    from app.complete_tool import build_hours, commercial, energy_cost, machine_hour_rate, part_span, tool_level
+    span = part_span(request.process.value, request.part)
+
+    route = dict(cnc_3_axis_share=cnc_3_axis_share, cnc_5_axis_share=cnc_5_axis_share,
+                 edm_share=edm_share, grinding_share=grinding_share)
+    # Each cavity has its own set of working inserts.
+    working_components = sum(component.pieces for component in sizing.components) * parts_per_mold
+    construction_hours = working_components * build_hours(
+        request.process.value, recommended_family, request.tolerance_level.value, request.surface_finish.value,
+        span)
+    construction_cost = construction_hours * machine_hour_rate(request.assumptions, route)
+    working_cost = (material_cost + transformation_cost + outside_machining_cost + inside_machining_cost
+                    + milling_tool_cost + heat_treatment_cost + construction_cost)
+    machine_hours = removed_volume_time_min / 60 * 1.25 + construction_hours
+    energy = energy_cost(request.assumptions, route, machine_hours)
+    # Broad processes size only the cavity and core inserts, so a mould base / die set is added.
+    level = tool_level(request.process.value, working_components, False, request.tolerance_level.value,
+                       working_cost, request.assumptions, span_mm=span)
 
     base_cost = (
-        material_cost
-        + transformation_cost
-        + outside_machining_cost
-        + inside_machining_cost
-        + milling_tool_cost
-        + heat_treatment_cost
+        working_cost
         + cooling_cost
+        + energy
+        + level["design_cost"]
+        + level["standard_parts_cost"]
+        + level["assembly_tryout_cost"]
     )
 
 
     # ---------------------------------------------------------
-    # 21. Existing Excel commercial adjustments
+    # 21. Commercial: country overhead and supplier margin
     # ---------------------------------------------------------
-    #
-    # IMPORTANT:
-    #
-    # These stay unchanged for now.
-    #
-    # We are still NOT applying:
-    #
-    # request.assumptions.overhead_rate
-    # request.assumptions.margin_rate
-    #
-    # because the existing workbook already has:
-    #
-    # +20% margin
-    # +5% handling
-    # +10% final markup
-    #
-    # We should clean this commercial layer separately.
 
-    margin = (
-        base_cost * 1.2
-        - base_cost
-    )
-
-    handling_cost = (
-        base_cost * 1.05
-        - base_cost
-    )
+    overhead_cost, margin = commercial(base_cost, request.assumptions)
+    handling_cost = 0.0
 
 
     # ---------------------------------------------------------
@@ -645,17 +646,11 @@ def calculate(
     # 23. Final price
     # ---------------------------------------------------------
 
-    total_before_final_markup = (
-        base_cost
-        + margin
-        + handling_cost
-        + transport_cost
-    )
-
-
     total_price = (
-        total_before_final_markup
-        * 1.1
+        base_cost
+        + overhead_cost
+        + margin
+        + transport_cost
     )
 
 
@@ -666,7 +661,21 @@ def calculate(
     return CalculationResponse(
         road_transport_cost=road_transport_cost,
         sea_transport_cost=sea_transport_cost,
-        final_markup=total_before_final_markup * 0.1,
+        final_markup=0,
+        overhead_cost=overhead_cost,
+        working_components_cost=working_cost,
+        construction_cost=construction_cost,
+        construction_hours=construction_hours,
+        design_cost=level["design_cost"],
+        design_hours=level["design_hours"],
+        standard_parts_cost=level["standard_parts_cost"],
+        standard_parts_note=level["standard_parts_note"],
+        assembly_tryout_cost=level["assembly_tryout_cost"],
+        energy_cost=energy,
+        cost_model_note=("Complete-tool estimate: cavity and core inserts (material x2 x1.4, transformation 50%, bulk machining "
+                         "+25%), construction hours per insert, design at the engineering rate, mould base or die set and standard "
+                         "parts, assembly and tryout, machine energy, then country overhead and supplier margin. Hot runners and "
+                         "machine-specific automation are additional."),
         total_machined_blocks=sum(component.pieces for component in sizing.components),
         recommendation_confidence_explanation=(
             "Your inputs match a specific material-selection rule. "

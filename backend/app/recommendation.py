@@ -23,7 +23,6 @@ PLASTIC_PROCESSES = {
 
 
 METAL_PROCESSES = {
-    "metal_molding",
     "stamping",
     "forming",
     "deep_drawing",
@@ -73,6 +72,9 @@ def recommend_tooling(request) -> ToolingRecommendation:
 
     process = request.process.value
 
+    if process == "metal_molding":
+        return recommend_die_casting_tooling(request)
+
     if process in PLASTIC_PROCESSES:
         return recommend_plastic_tooling(request)
 
@@ -82,6 +84,46 @@ def recommend_tooling(request) -> ToolingRecommendation:
     raise ValueError(
         f"No tooling recommendation rules available "
         f"for process '{process}'."
+    )
+
+
+def recommend_die_casting_tooling(request) -> ToolingRecommendation:
+    """Die casting / metal molding: molten metal needs hot-work steel.
+
+    Cold-work steels such as D2 are not suitable: thermal cycling of several hundred
+    degrees per shot cracks them (heat checking).
+    """
+    material = request.workpiece_material.value
+    cycles = request.expected_cycles
+    failure_modes = ["thermal fatigue", "erosion"]
+    reasons = [
+        "Molten metal is injected at several hundred degrees, so the cavity needs a hot-work steel "
+        "with high temper resistance and thermal-fatigue strength (H13 / 1.2344 class).",
+    ]
+    if material in {"cast_aluminum", "aluminum_sheet", "other"}:
+        failure_modes.append("soldering")
+        reasons.append("Aluminium alloys solder to steel dies; nitriding or PVD coating and die spray reduce it.")
+    if material == "copper_brass":
+        reasons.append("Brass and copper die casting is very hard on dies: expect a short die life and plan replacement inserts.")
+    if cycles >= 100_000:
+        failure_modes.append("long-term wear")
+        reasons.append("Above about 100,000 shots, use premium ESR hot-work steel and plan replacement cavity inserts.")
+    return ToolingRecommendation(
+        material_family="hardened_mold_steel",
+        material_label="Hot-work tool steel (H13 / 1.2344; premium ESR for long runs)",
+        confidence="high",
+        failure_modes=unique_items(failure_modes),
+        reasons=unique_items(reasons),
+        requires_heat_treatment=True,
+        recommended_operations=[
+            "CNC rough machining in the annealed state",
+            "stress relieving",
+            "semi-finish machining",
+            "vacuum hardening and double or triple tempering to about 44–48 HRC",
+            "hard milling and EDM of cavity details",
+            "nitriding or PVD coating against soldering and wear",
+            "polishing and dimensional inspection",
+        ],
     )
 
 
@@ -241,10 +283,17 @@ def recommend_plastic_tooling(
 
 
     # =========================================================
-    # CORROSIVE APPLICATION
+    # CORROSIVE OR OPTICAL APPLICATION
     # =========================================================
 
-    if corrosive:
+    if surface_finish == "optical" and not corrosive:
+        # Mirror polish needs a clean (ESR) stainless mold steel; P20 pits when polished.
+        reasons.append(
+            "An optical finish needs a clean, polishable stainless mold steel "
+            "(for example 1.2083 ESR) hardened to about 50 HRC; P20 cannot reach a mirror polish."
+        )
+
+    if corrosive or surface_finish == "optical":
 
         if abrasive:
             reasons.append(

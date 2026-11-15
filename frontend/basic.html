@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Quick Tooling Price</title>
+    <meta name="description" content="A quick planning price for the tooling of a part." />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=JetBrains+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+    <script src="common.js"></script>
+  </head>
+
+  <body>
+    <div class="app-shell">
+      <header class="app-header">
+        <div class="app-header-inner">
+          <a class="brand-link" href="index.html">
+            <span class="brand-mark" aria-hidden="true">TC</span>
+            <span class="brand-name">Tooling Cost Estimator</span>
+          </a>
+          <nav class="mode-nav" aria-label="Estimator mode">
+            <a href="basic.html" aria-current="page">Quick price</a>
+            <a href="advanced.html">Detailed analysis</a>
+          </nav>
+          <button type="button" class="theme-toggle" data-theme-toggle aria-label="Switch theme">
+            <svg class="icon-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.2M12 19.3v2.2M4.6 4.6l1.6 1.6M17.8 17.8l1.6 1.6M2.5 12h2.2M19.3 12h2.2M4.6 19.4l1.6-1.6M17.8 6.2l1.6-1.6"/></svg>
+            <svg class="icon-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.2 14.6A8.4 8.4 0 0 1 9.4 3.8a8.4 8.4 0 1 0 10.8 10.8Z"/></svg>
+          </button>
+        </div>
+      </header>
+      <div class="page-hero">
+        <p class="eyebrow">Quick price</p>
+        <h1>Tooling price in a few inputs</h1>
+        <p class="header-copy">Standard assumptions fill in the rest. For editable rates, drawing upload and a full production report, use the detailed analysis.</p>
+      </div>
+
+      <main>
+        <div class="overview-grid basic-grid">
+          <form id="basic-form" class="input-column" novalidate>
+            <section class="input-card">
+              <div class="section-heading">
+                <span class="step-number">01</span>
+                <div>
+                  <h2 class="card-title">Production</h2>
+                  <p>Where and how the part will be made.</p>
+                </div>
+              </div>
+              <div class="form-grid two-col">
+                <div class="field field-span-2">
+                  <label for="b-country">Manufacturing country</label>
+                  <select id="b-country" required></select>
+                </div>
+                <div class="field">
+                  <label for="b-process">Manufacturing process</label>
+                  <select id="b-process" required></select>
+                </div>
+                <div class="field">
+                  <label for="b-material">Part material</label>
+                  <select id="b-material" required></select>
+                </div>
+              </div>
+              <div class="form-grid two-col basic-detail">
+                <div class="field field-span-2">
+                  <label for="b-detail">Material grade and form <span class="unit">optional</span></label>
+                  <select id="b-detail"><option value="">Automatic (from part material)</option></select>
+                </div>
+              </div>
+              <p id="b-process-note" class="field-help"></p>
+            </section>
+
+            <section class="input-card">
+              <div class="section-heading">
+                <span class="step-number">02</span>
+                <div>
+                  <h2 class="card-title">Part and quantity</h2>
+                  <p>The overall size of the finished part and how many you will make.</p>
+                </div>
+              </div>
+              <div class="form-grid three-col">
+                <div class="field">
+                  <label for="b-l">Length <span class="unit">mm</span></label>
+                  <input id="b-l" type="number" min="0" step="any" inputmode="decimal" required />
+                </div>
+                <div class="field">
+                  <label for="b-w">Width <span class="unit">mm</span></label>
+                  <input id="b-w" type="number" min="0" step="any" inputmode="decimal" required />
+                </div>
+                <div class="field">
+                  <label for="b-h">Height <span class="unit">mm</span></label>
+                  <input id="b-h" type="number" min="0" step="any" inputmode="decimal" required />
+                </div>
+              </div>
+              <div class="form-grid three-col">
+                <div class="field">
+                  <label for="b-t">Wall / sheet thickness <span class="unit">mm</span></label>
+                  <input id="b-t" type="number" min="0" step="any" inputmode="decimal" required />
+                </div>
+                <div class="field">
+                  <label for="b-qty">Lifetime quantity <span class="unit">parts</span></label>
+                  <input id="b-qty" type="number" min="1" step="1" inputmode="numeric" required />
+                </div>
+                <div class="field">
+                  <label for="b-sets" id="b-sets-label">Identical tools</label>
+                  <input id="b-sets" type="number" min="1" max="30" step="1" inputmode="numeric" required />
+                </div>
+              </div>
+            </section>
+
+            <div class="calculate-bar">
+              <div class="calculate-status-wrap">
+                <span class="status-dot" aria-hidden="true"></span>
+                <p id="b-status" class="calc-status" aria-live="polite">Loading…</p>
+              </div>
+              <button id="b-submit" type="submit" class="calculate-btn" disabled>Get price</button>
+            </div>
+          </form>
+
+          <aside class="results-column">
+            <section class="result-card price-card" aria-labelledby="b-price-heading">
+              <div class="result-card-header">
+                <div>
+                  <p class="eyebrow">Planning estimate</p>
+                  <h2 id="b-price-heading">Tooling price</h2>
+                </div>
+                <span id="b-state" class="status-chip accent" aria-live="polite">Not calculated</span>
+              </div>
+              <div class="price-hero">
+                <span id="b-currency" class="currency">€</span>
+                <strong id="b-price">—</strong>
+              </div>
+              <p id="b-range" class="price-caption">Enter your part and select Get price.</p>
+              <p id="b-currency-note" class="field-help"></p>
+
+              <div class="result-summary-grid basic-tiles">
+                <div class="summary-tile"><span>Tooling cost per part (lifetime)</span><strong id="b-per-part">—</strong></div>
+                <div class="summary-tile"><span>Recommended tooling material</span><strong id="b-tool-material">—</strong></div>
+                <div class="summary-tile wide"><span>Tool concept</span><strong id="b-concept">—</strong></div>
+              </div>
+
+              <div id="b-matrix" class="matrix-callout" hidden>
+                <span>Recommended route at your quantity</span>
+                <strong id="b-matrix-route"></strong>
+                <small id="b-matrix-note"></small>
+              </div>
+
+              <h3 class="mini-heading">Main cost drivers</h3>
+              <div id="b-drivers" class="bar-list"><p class="field-help">Calculate to see where the money goes.</p></div>
+
+              <a id="b-advanced" class="calculate-btn link-btn" href="advanced.html">See the full analysis for this part <span aria-hidden="true">→</span></a>
+              <p class="field-help">Opens the detailed analysis with these inputs. It compares tooling materials, processes and countries, and lists risks and design advice.</p>
+
+              <details class="technical-details">
+                <summary>Assumptions used</summary>
+                <ul class="recommendation-list method-notes">
+                  <li>Complete-tool estimate: working components, construction hours, design, tool base and standard parts, assembly and tryout. Hot runners and machine-specific automation are not included.</li>
+                  <li>Cost per part includes replacement working components when the quantity exceeds their typical life.</li>
+                  <li>Labour and machine rates are the selected country's defaults.</li>
+                  <li>Standard tolerance and surface finish, no extra corrosion or abrasion protection.</li>
+                  <li>No cooling system and no transport cost.</li>
+                  <li>European countries are costed in euros. China and India are costed in US dollars; EUR benchmarks are converted at the European Central Bank reference rate.</li>
+                  <li>The range reflects the typical accuracy of an early estimate (−20% to +30%). It is not a statistical confidence interval.</li>
+                </ul>
+              </details>
+            </section>
+          </aside>
+        </div>
+      </main>
+    </div>
+    <script src="basic.js"></script>
+  </body>
+</html>

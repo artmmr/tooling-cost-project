@@ -18,7 +18,7 @@ const closeTo = (a, b, message) => assert(Math.abs(a - b) < 1e-7 * Math.max(1, M
   const url = `http://127.0.0.1:${port}`;
   const server = spawn(process.env.PYTHON || 'python3', ['-c',
     'import os,uvicorn;from app.main import app;from fastapi.staticfiles import StaticFiles;app.mount("/",StaticFiles(directory=os.environ["TEST_FRONTEND"],html=True));uvicorn.run(app,host="127.0.0.1",port=int(os.environ["TEST_PORT"]),log_level="error")'],
-    {cwd:root, env:{...process.env, TEST_PORT:String(port), TEST_FRONTEND:frontend}, stdio:['ignore','pipe','pipe']});
+    {cwd:root, env:{...process.env, TEST_PORT:String(port), TEST_FRONTEND:frontend, FX_ECB_URL:process.env.FX_ECB_URL || 'file://'+path.join(__dirname,'fixtures','ecb_sample.xml')}, stdio:['ignore','pipe','pipe']});
   let serverErrors = '', browser;
   server.stderr.on('data', data => serverErrors += data);
   const failures = [], requests = [];
@@ -35,7 +35,7 @@ const closeTo = (a, b, message) => assert(Math.abs(a - b) < 1e-7 * Math.max(1, M
         args:['--no-sandbox','--no-zygote','--single-process','--disable-dev-shm-usage','--disable-webgl']} : {})});
     const page = await browser.newPage({viewport:{width:1440,height:1080}});
     page.on('pageerror', error => failures.push(error.message));
-    page.on('request', request => {if(request.url().endsWith('/api/calculate')) requests.push(request.postDataJSON());});
+    page.on('request', request => {if(/\/api\/(calculate|advanced-report)$/.test(request.url())) requests.push(request.postDataJSON());});
     // Fonts are optional; make the test independent of external network access.
     await page.route('**/*', route => route.request().url().startsWith(url) ? route.continue() : route.abort());
     await page.addInitScript(base => globalThis.TOOLING_API_BASE_URL = base, url);
@@ -52,10 +52,12 @@ const closeTo = (a, b, message) => assert(Math.abs(a - b) < 1e-7 * Math.max(1, M
     const edit = async (id, input) => {await change(id,input); await ready();};
     const openComponent = async id => {
       const detail = page.locator(`#block-${id}-pieces`).locator('xpath=ancestor::details[1]');
-      if ((await detail.getAttribute('open')) === null) await detail.locator('summary').click();
+      if ((await detail.getAttribute('open')) === null) await click(detail.locator('summary'));
     };
+    // Centre the target first: sticky bars can cover an element scrolled just into view.
+    const click = async locator => {await locator.evaluate(el => el.scrollIntoView({block:'center'})); await locator.click();};
     const check = async (name, test) => {await test(); console.log(`PASS ${++passed}: ${name}`);};
-    await page.goto(`${url}/index.html`);
+    await page.goto(`${url}/advanced.html`);
     await page.waitForFunction(() => document.getElementById('calc-status').textContent === 'Ready to calculate.');
 
     await check('Catalog, six bands, initial calculation and nautical miles', async () => {
@@ -63,7 +65,7 @@ const closeTo = (a, b, message) => assert(Math.abs(a - b) < 1e-7 * Math.max(1, M
       assert.equal(await page.locator('#inp-cycles option').count(),6);
       assert.equal(await value('inp-process'),'die_casting');
       closeTo(Number(await value('inp-sea')),19800/1.852);
-      await page.locator('#calculate-btn').click(); await ready();
+      await click(page.locator('#calculate-btn')); await ready();
       assert.equal(await page.locator('#out-blocks tbody tr').count(),2);
       assert.equal(await page.locator('#block-editors details').count(),2);
       assert((await text('block-counts')).startsWith('2 machined blocks'));
@@ -91,7 +93,7 @@ const closeTo = (a, b, message) => assert(Math.abs(a - b) < 1e-7 * Math.max(1, M
       assert.equal(latest().block_overrides[0].nominal_length_mm,200);
       await edit('inp-expected-cycles',101);
       assert.equal(await value('block-P03-C01-nominal_length_mm'),'200');
-      await page.locator('[data-reset-component="P03-C01"]').click(); await ready();
+      await click(page.locator('[data-reset-component="P03-C01"]')); await ready();
       assert.equal(await value('block-P03-C01-nominal_length_mm'),initial);
       assert.equal(latest().block_overrides.length,0);
     });
@@ -105,13 +107,13 @@ const closeTo = (a, b, message) => assert(Math.abs(a - b) < 1e-7 * Math.max(1, M
       await page.waitForFunction(() => document.getElementById('calc-status').classList.contains('err'));
       assert.equal(await page.locator('#estimate-state').getAttribute('data-stale'),'true');
       assert((await text('calc-status')).includes('100'),await text('calc-status'));
-      await page.locator('[data-reset-component="P03-C01"]').click(); await ready();
+      await click(page.locator('[data-reset-component="P03-C01"]')); await ready();
       assert.equal(Number(await value('block-P03-C01-block_price_per_tonne')),original);
       await edit('block-P03-C01-machining_volume_m3',0);
       assert.equal(latest().block_overrides[0].machining_volume_m3,0);
       await edit('block-P03-C01-material_family','aluminum_tooling');
       assert.equal(latest().block_overrides[0].material_family,'aluminum_tooling');
-      await page.locator('#reset-blocks').click(); await ready();
+      await click(page.locator('#reset-blocks')); await ready();
     });
     await check('Reference mode locks part dimensions and stock form can change', async () => {
       await edit('inp-l',200);
@@ -127,19 +129,35 @@ const closeTo = (a, b, message) => assert(Math.abs(a - b) < 1e-7 * Math.max(1, M
       await edit('inp-sizing-mode','part_scaled');
       assert(!(await page.locator('#inp-l').isDisabled()));
     });
-    await check('Country flags, missing FX, USD conversion and pending overrides', async () => {
+    await check('Country flags, ECB rate, USD-costed countries and pending overrides', async () => {
       const countryDetails = page.locator('#inp-cnc3-rate').locator('xpath=ancestor::details[1]');
-      await countryDetails.locator('summary').click();
+      await click(countryDetails.locator('summary'));
       await edit('inp-cnc3-rate',999);
       assert((await text('country-defaults-flag')).includes('modified'));
-      await page.locator('#reset-country-defaults').click(); await ready();
+      await click(page.locator('#reset-country-defaults')); await ready();
       assert.equal(await text('country-defaults-flag'),'Country defaults');
       await openComponent('P03-C01');
       const price = Number(await value('block-P03-C01-block_price_per_tonne'));
-      await change('inp-country','CN');
-      await page.waitForFunction(() => document.getElementById('calc-status').textContent.includes('exchange rate'));
-      assert(await page.locator('#block-P03-C01-block_price_per_tonne').isDisabled());
+      // China is costed in USD: the ECB rate (1.16 in the test file) loads automatically.
+      await edit('inp-country','CN');
+      assert.equal(await value('inp-fx'),'1.16');
+      assert.equal(await value('inp-fx-date'),'2026-11-13');
+      assert((await text('fx-source')).includes('European Central Bank'));
+      assert(await page.locator('#fx-reset').isHidden());
+      assert.equal(await text('result-currency'),'USD');
+      // Country rates are US-dollar amounts and are shown unchanged; EUR benchmarks are converted.
+      assert.equal(await value('inp-cnc3-rate'),'35');
+      closeTo((await state()).assumptions.cnc_3_axis_rate,35/1.16);
+      assert.equal(latest().eur_to_usd,1.16);
+      closeTo(Number(await value('block-P03-C01-block_price_per_tonne')),price*1.16);
+      assert.equal(await text('country-defaults-flag'),'Country defaults');
+      // An agreed rate overrides the ECB rate without changing the USD country rates.
       await change('inp-fx',1.2); await change('inp-fx-date','2026-10-14'); await ready();
+      assert.equal(await value('inp-cnc3-rate'),'35');
+      closeTo((await state()).assumptions.cnc_3_axis_rate,35/1.2);
+      assert.equal(await text('country-defaults-flag'),'Country defaults');
+      assert(await page.locator('#fx-reset').isVisible());
+      assert((await text('fx-source')).includes('Your own rate'));
       closeTo(Number(await value('block-P03-C01-block_price_per_tonne')),price*1.2);
       await edit('block-P03-C01-block_price_per_tonne',price*2*1.2);
       closeTo((await state()).block_overrides[0].tooling_material_assumptions.block_price_per_tonne,price*2);
@@ -149,7 +167,12 @@ const closeTo = (a, b, message) => assert(Math.abs(a - b) < 1e-7 * Math.max(1, M
       await change('block-P03-C01-block_price_per_tonne',price*3*1.5);
       await change('inp-fx',2); await ready();
       closeTo(Number(await value('block-P03-C01-block_price_per_tonne')),price*3*2);
+      await click(page.locator('#fx-reset')); await ready();
+      assert.equal(await value('inp-fx'),'1.16');
+      closeTo(Number(await value('block-P03-C01-block_price_per_tonne')),price*3*1.16);
       await edit('inp-country','DE');
+      assert.equal(await text('result-currency'),'EUR');
+      assert.equal(await value('inp-cnc3-rate'),'110');
       closeTo(Number(await value('block-P03-C01-block_price_per_tonne')),price*3);
     });
     await check('Purchased assembly is explicitly partial until price and mass are supplied', async () => {
@@ -165,7 +188,7 @@ const closeTo = (a, b, message) => assert(Math.abs(a - b) < 1e-7 * Math.max(1, M
       await edit('block-P20-C03-purchased_unit_cost_eur',0);
       await edit('block-P20-C03-purchased_unit_weight_kg',0);
       assert.equal(await text('estimate-scope'),'');
-      await page.locator('#reset-blocks').click(); await ready();
+      await click(page.locator('#reset-blocks')); await ready();
       assert((await text('estimate-scope')).includes('Partial subtotal'));
     });
     await check('Every detailed process renders its component editor; tool sets count once', async () => {
@@ -184,37 +207,37 @@ const closeTo = (a, b, message) => assert(Math.abs(a - b) < 1e-7 * Math.max(1, M
       await edit('inp-process','plastic_injection');
       assert(await page.locator('#workbook-results').isHidden());
       assert(await page.locator('#legacy-tooling-assumptions').isVisible());
-      if((await page.locator('#legacy-tooling-assumptions').getAttribute('open'))===null) await page.locator('#legacy-tooling-assumptions > summary').click();
+      if((await page.locator('#legacy-tooling-assumptions').getAttribute('open'))===null) await click(page.locator('#legacy-tooling-assumptions > summary'));
       const price = Number(await value('inp-tool-price'));
       const total = await text('out-total');
       await edit('inp-tool-price',price*2);
       assert.notEqual(await text('out-total'),total);
       assert.equal(Number(await value('inp-tool-price')),price*2);
-      await page.locator('#reset-tooling-defaults').click(); await ready();
+      await click(page.locator('#reset-tooling-defaults')); await ready();
       assert.equal(Number(await value('inp-tool-price')),price);
       assert(!('expected_quantity' in latest()));
     });
     await check('Zero freight, restore, and whole-unit input arrows', async () => {
-      await page.locator('[data-tab="transport"]').click();
+      await click(page.locator('[data-tab="transport"]'));
       await edit('road-rate',0); await edit('sea-rate',0);
       assert((await text('freight-breakdown')).includes('Total freight: EUR 0.00'));
-      await page.locator('#reset-logistics').click(); await ready();
+      await click(page.locator('#reset-logistics')); await ready();
       closeTo(Number(await value('road-rate')),5.6);
-      await page.locator('[data-tab="calc"]').click();
+      await click(page.locator('[data-tab="calc"]'));
       const sea = page.locator('#inp-sea'); await sea.fill('10'); await sea.press('ArrowUp'); await sea.blur(); await ready();
       assert.equal(await value('inp-sea'),'11');
       await edit('inp-process','die_casting'); await openComponent('P03-C01');
       const field=page.locator('#block-P03-C01-allowance_mm');
       await field.fill('3'); await field.press('ArrowUp'); await field.blur(); await ready();
       assert.equal(await field.inputValue(),'4');
-      assert(await page.locator('input[type=number]').evaluateAll(fields=>fields.every(f=>f.step==='1')));
+      assert(await page.locator('#panel-calc input[type=number], #panel-transport input[type=number]').evaluateAll(fields=>fields.every(f=>f.step==='1')));
     });
     await check('Late responses cannot replace newer edits', async () => {
       let release, captured;
       const blocked = new Promise(resolve=>release=resolve);
       const intercepted = new Promise(resolve=>captured=resolve);
       let first=true;
-      await page.route('**/api/calculate',async route=>{
+      await page.route('**/api/advanced-report',async route=>{
         if(first){first=false;const response=await route.fetch();captured();await blocked;try{await route.fulfill({response});}catch{}}
         else await route.continue();
       });
@@ -222,17 +245,20 @@ const closeTo = (a, b, message) => assert(Math.abs(a - b) < 1e-7 * Math.max(1, M
       await edit('inp-l',210);
       const newest=await text('out-total'); release(); await pause(200);
       assert.equal(await text('out-total'),newest); assert.equal(latest().part.length_mm,210);
-      await page.unroute('**/api/calculate');
+      await page.unroute('**/api/advanced-report');
     });
     await check('Desktop and mobile layout with no document overflow or runtime errors', async () => {
-      await page.locator('#reset-blocks').click(); await ready();
-      await page.locator('#use-reference-part').click(); await ready();
+      await click(page.locator('#reset-blocks')); await ready();
+      await click(page.locator('#use-reference-part')); await ready();
       const screenshots=process.env.TOOLING_SCREENSHOTS;
       if(screenshots)fs.mkdirSync(screenshots,{recursive:true});
       for(const [width,height] of [[1440,1080],[390,844]]){
         await page.setViewportSize({width,height});
         await page.evaluate(()=>scrollTo(0,0));
-        assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`Page overflows at ${width}px`);
+        const wide=await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth?[]:[...document.querySelectorAll('body *')]
+          .filter(el=>el.getBoundingClientRect().right>innerWidth+1&&!el.closest('.table-wrap')).slice(0,8)
+          .map(el=>`${el.tagName.toLowerCase()}#${el.id}.${el.className}`));
+        assert.deepEqual(wide,[],`Page overflows at ${width}px`);
         if(screenshots)await page.screenshot({path:path.join(screenshots,`tooling-${width}.png`),fullPage:true});
       }
       assert.deepEqual(failures,[]);

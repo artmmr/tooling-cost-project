@@ -5,6 +5,10 @@ remain application assumptions and are not presented as workbook facts.
 """
 from dataclasses import asdict
 from math import ceil
+import re
+from types import SimpleNamespace
+
+from app.complete_tool import build_hours, commercial, energy_cost, machine_hour_rate, part_span, tool_level
 
 from app.models import CalculationResponse, ToolingBlockComponentResponse
 from app.tooling_catalog import process_definition, quantity_grade
@@ -34,6 +38,17 @@ def costing_family(record):
     return "cold_work_tool_steel"
 
 
+# Premium remelted or powder-metallurgy grades cost about 1.6x the standard grade.
+PREMIUM_GRADE = re.compile(r"\bESR\b|premium|Dievar|Formvar|Vanadis|Caldie", re.I)
+PREMIUM_FACTOR = 1.6
+NON_WORKING_ROLES = ("SUPPORT", "STRIPPER", "HOLDER", "FLUID CHAMBER", "BLANK HOLDER")
+
+
+def is_working(role):
+    role = (role or "").upper()
+    return not any(word in role for word in NON_WORKING_ROLES)
+
+
 def calculate_workbook(request):
     # Imported here so the legacy calculator can dispatch without a module cycle.
     from app.calculator import calculate_cooling_cost, validate_route
@@ -60,7 +75,13 @@ def calculate_workbook(request):
     if request.parts_per_mold > 1:
         warnings.append("Multiple sets repeat the complete component package. This does not design a shared multi-cavity layout or enlarge individual blocks.")
 
-    costs = {key: 0.0 for key in ("material", "transformation", "outside", "inside", "milling", "heat", "purchased")}
+    costs = {key: 0.0 for key in ("material", "transformation", "outside", "inside", "milling", "heat", "purchased", "construction")}
+    # Reference mode prices the workbook's reference part, whatever part size was typed.
+    sized_part = request.part if request.sizing_mode == "part_scaled" else SimpleNamespace(**definition["reference_part"])
+    span = part_span(process, sized_part)
+    construction_hours = machine_hours = energy = 0.0
+    working_pieces = 0
+    has_carriers = False
     total_weight = total_outside = total_inside = total_minutes = 0.0
     milling_index = 0
     complete = True
@@ -100,6 +121,10 @@ def calculate_workbook(request):
             "density_kg_m3", "block_price_per_tonne", "removal_rate_cm3_min", "milling_volume_factor",
             "milling_tool_price", "heat_treatment_eur_per_kg",
         )}
+        premium = (bool(PREMIUM_GRADE.search(block["material"])) and "material_family" not in override
+                   and "tooling_material_assumptions" not in override)
+        if premium:
+            material["block_price_per_tonne"] *= PREMIUM_FACTOR
         material.update(override.get("tooling_material_assumptions", {}))
         route = override.get("manufacturing_route", defaults["route"])
         validate_route(**route)
@@ -121,10 +146,21 @@ def calculate_workbook(request):
         milling_index += index
         # Existing commercial/material allowances retained; quantities are counted once.
         material_cost = weight * material["block_price_per_tonne"] / 1000 * 2 * 1.4
+        working = is_working(block["role"])
+        hours = build_hours(process, family, request.tolerance_level.value, request.surface_finish.value, span) * count if working else 0
+        if working:
+            working_pieces += count
+        else:
+            has_carriers = True
+        construction_hours += hours
+        block_machine_hours = (minutes_out + minutes_in) / 60 * 1.25 + hours
+        machine_hours += block_machine_hours
+        energy += energy_cost(request.assumptions, route, block_machine_hours)
         component_costs = dict(material=material_cost, transformation=material_cost * 0.5,
                                outside=minutes_out * minute_rate * 1.25, inside=minutes_in * minute_rate * 1.25,
                                milling=index * material["milling_tool_price"],
-                               heat=weight * material["heat_treatment_eur_per_kg"])
+                               heat=weight * material["heat_treatment_eur_per_kg"],
+                               construction=hours * machine_hour_rate(request.assumptions, route))
         for key, value in component_costs.items():
             costs[key] += value
         raw_label = (f"Diameter {block['raw_length_mm']:g} x {block['raw_height_mm']:g} mm"
@@ -135,12 +171,18 @@ def calculate_workbook(request):
                                             "finished_length_mm", "finished_width_mm", "finished_height_mm")},
             raw_stock=raw_label, raw_volume_m3=raw, finished_volume_m3=block["finished_volume_m3"] * count,
             machining_volume_m3=block["machining_volume_m3"] * count, weight_kg=weight,
-            material_family=family, costing_material=f"{profile.name} (cost proxy)",
+            material_family=family,
+            costing_material=f"{profile.name} (cost proxy{', premium grade x1.6' if premium else ''})",
             material_assumptions=material, manufacturing_route=route, cost_before_commercial=sum(component_costs.values()),
         ))
     cooling = calculate_cooling_cost(total_weight, request.includes_cooling)
-    base_cost = sum(costs.values()) + cooling
-    margin, handling = base_cost * 0.2, base_cost * 0.05
+    working_cost = sum(costs.values()) - costs["purchased"]
+    # Identical tool sets: designed once, each set assembled and tried out.
+    level = tool_level(process, working_pieces, has_carriers, request.tolerance_level.value, working_cost,
+                       request.assumptions, sets=request.parts_per_mold, span_mm=span)
+    base_cost = (sum(costs.values()) + cooling + energy + level["design_cost"] + level["standard_parts_cost"]
+                 + level["assembly_tryout_cost"])
+    overhead, margin = commercial(base_cost, request.assumptions)
     logistics = request.logistics
     sea_nm = request.sea_distance_nm if request.sea_distance_nm is not None else request.sea_distance_km / 1.852
 
@@ -150,7 +192,7 @@ def calculate_workbook(request):
 
     road = request.truck_distance_km * logistics.road_rate_eur_per_km * load(logistics.road_load_kg) * logistics.road_journeys
     sea = sea_nm * logistics.sea_rate_eur_per_nm * load(logistics.sea_load_kg) * logistics.sea_journeys
-    subtotal = base_cost + margin + handling + road + sea
+    subtotal = base_cost + overhead + margin + road + sea
     machined = [b for b in outputs if not b.purchased]
     reasons = [f"Lifetime quantity {quantity:,} selects {grade['band']}: {grade['concept']}.",
                grade["conditions"], f"Treatment guidance: {grade['treatment']}.",
@@ -179,9 +221,12 @@ def calculate_workbook(request):
         milling_time_index=milling_index, removed_volume_time_min=total_minutes,
         material_cost=costs["material"], transformation_cost=costs["transformation"],
         outside_machining_cost=costs["outside"], inside_machining_cost=costs["inside"], milling_tool_cost=costs["milling"],
-        cooling_cost=cooling, heat_treatment_cost=costs["heat"], margin=margin, handling_cost=handling,
-        road_transport_cost=road, sea_transport_cost=sea, transport_cost=road + sea, final_markup=subtotal * 0.1,
-        total_price=subtotal * 1.1, recommended_material=grade["candidates"],
+        cooling_cost=cooling, heat_treatment_cost=costs["heat"], margin=margin, handling_cost=0, overhead_cost=overhead,
+        working_components_cost=working_cost, construction_cost=costs["construction"], construction_hours=construction_hours,
+        design_cost=level["design_cost"], design_hours=level["design_hours"], standard_parts_cost=level["standard_parts_cost"],
+        standard_parts_note=level["standard_parts_note"], assembly_tryout_cost=level["assembly_tryout_cost"], energy_cost=energy,
+        road_transport_cost=road, sea_transport_cost=sea, transport_cost=road + sea, final_markup=0,
+        total_price=subtotal, recommended_material=grade["candidates"],
         recommended_material_family=profiles_used[0], recommendation_confidence="review_required",
         recommendation_confidence_explanation="The process and quantity match a workbook rule. Geometry, pressure, temperature, grade suitability and tool life have not been validated by these planning values.",
         failure_modes=["dimensional drift", "surface degradation", "high mechanical loading"],
@@ -191,5 +236,9 @@ def calculate_workbook(request):
                                 "Machine working features using the component-specific route allocations.",
                                 f"Qualify and apply treatment: {grade['treatment']}.",
                                 "Finish, inspect, assemble and qualify the tool under production conditions."],
-        cost_model_note="V4 supplies sizing and selection guidance, not costs. Existing app allowances remain: material x2 x1.4, transformation 50%, machining 25%, margin 20%, handling 5%, final markup 10%. Engineering, electricity, overhead and supplier-margin controls are not applied. Tool bases, machine services and excluded hardware are additional.",
+        cost_model_note=("V4 supplies sizing and selection guidance, not costs. Complete-tool estimate: working blocks (material x2 x1.4, "
+                         "transformation 50%, bulk machining +25%), construction hours per working component, design at the engineering "
+                         "rate, standard parts and tool base, assembly and tryout, machine energy at the electricity price, then overhead "
+                         "and supplier margin from the country inputs. Premium grades (ESR, Dievar, Vanadis...) cost 1.6x. Hot runners, "
+                         "machine-specific automation and excluded hardware are additional."),
     )

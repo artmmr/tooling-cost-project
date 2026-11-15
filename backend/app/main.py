@@ -1,11 +1,21 @@
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.concurrency import run_in_threadpool
 
 from app.country_profiles import COUNTRY_PROFILES
+from app.fx import FxRate, FxUnavailableError, eur_usd
+from app.process_matrix import public_matrix
 from app.tooling_materials import TOOLING_MATERIALS
 
+from app.advisor import AdvancedReport, build_report
 from app.calculator import calculate
+from app.summary import (
+    SummaryRateLimitError,
+    SummaryRequest,
+    SummaryResponse,
+    SummaryUnavailableError,
+    summarize,
+)
 from app.drawing_extraction import (
     DrawingExtractionError,
     DrawingExtractionResponse,
@@ -64,6 +74,38 @@ def calculate_tooling(
 
 
 @app.post(
+    "/api/advanced-report",
+    response_model=AdvancedReport,
+)
+def advanced_report(request: CalculationRequest) -> AdvancedReport:
+    try:
+        return build_report(request)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+def client_id(http_request: Request) -> str:
+    # Render terminates TLS at a proxy; the first forwarded address is the client.
+    forwarded = http_request.headers.get("x-forwarded-for", "")
+    return forwarded.split(",")[0].strip() or (http_request.client.host if http_request.client else "unknown")
+
+
+@app.post(
+    "/api/advanced-report/summary",
+    response_model=SummaryResponse,
+)
+async def advanced_report_summary(body: SummaryRequest, http_request: Request) -> SummaryResponse:
+    try:
+        return await run_in_threadpool(summarize, body, client_id(http_request))
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except SummaryRateLimitError as exc:
+        raise HTTPException(status_code=429, detail=str(exc)) from exc
+    except SummaryUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@app.post(
     "/api/extract-dimensions",
     response_model=DrawingExtractionResponse,
 )
@@ -87,9 +129,23 @@ def get_countries():
         {
             "code": code,
             "name": profile["name"],
+            "currency": profile["currency"],
         }
         for code, profile in COUNTRY_PROFILES.items()
     ]
+
+
+@app.get("/api/fx/eur-usd", response_model=FxRate)
+def get_eur_usd() -> FxRate:
+    try:
+        return eur_usd()
+    except FxUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@app.get("/api/process-matrix")
+def get_process_matrix():
+    return public_matrix()
 
 
 @app.get("/api/reference-data")
