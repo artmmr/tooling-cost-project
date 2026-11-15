@@ -457,77 +457,18 @@
                 <p class="price-caption"><span id="out-range">Likely range appears after calculating</span> · <span id="result-currency">EUR</span></p>
                 <p id="estimate-scope" class="estimate-warning" role="status"></p>
 
-                <div class="result-summary-grid">
-                  <div class="summary-tile wide">
-                    <span>Costing material</span>
-                    <strong id="out-c12">—</strong>
-                  </div>
-                  <div class="summary-tile wide">
-                    <span>Maximum individual stock dimensions</span>
-                    <strong id="out-c13">—</strong>
-                  </div>
+                <dl class="price-facts">
+                  <div><dt>Per part (lifetime)</dt><dd id="pc-per-part">—</dd></div>
+                  <div><dt>Lifetime tooling</dt><dd id="pc-lifetime">—</dd></div>
+                  <div class="wide"><dt>Tool steel</dt><dd id="pc-steel">—</dd></div>
+                  <div class="wide"><dt>Largest stock block</dt><dd id="out-c13">—</dd></div>
+                </dl>
+
+                <p class="price-scope">Complete tool, including design, tool base, assembly and tryout. Hot runners are not included.</p>
+                <div class="price-links">
+                  <a href="#rs-cost">Where the money goes</a>
+                  <a href="#rs-components">Components and cost details</a>
                 </div>
-
-                <p class="field-help">Complete tool: working components, construction, design, tool base and standard parts, assembly and tryout. Hot runners and automation are not included.</p>
-
-                <details class="technical-details tooling-block-details" open>
-                  <summary>Tool block sizing</summary>
-                  <div class="details-body">
-                    <p id="tooling-sizing-basis" class="field-help standalone">
-                      Calculate to see the working-block sizing assumptions.
-                    </p>
-                    <p class="field-help">Scroll across the table to see stock, material and process details.</p>
-                    <div class="table-wrap" role="region" aria-label="Component stock and material details" tabindex="0">
-                      <table class="outputs-table block-table" id="out-blocks">
-                        <thead>
-                          <tr>
-                            <th>Component</th>
-                            <th>Role</th>
-                            <th>Pieces</th>
-                            <th>Raw stock</th>
-                            <th>Material / process note</th>
-                          </tr>
-                        </thead>
-                        <tbody></tbody>
-                      </table>
-                    </div>
-                  </div>
-                </details>
-
-                <section id="workbook-results" hidden>
-                  <p id="block-counts" class="field-help"></p>
-                  <p id="grade-summary" class="field-help"></p>
-                  <div class="section-title-row">
-                    <h3>Component inputs</h3>
-                    <span id="block-modified" class="summary-meta">Workbook defaults</span>
-                  </div>
-                  <div id="block-editors"></div>
-                  <button id="reset-blocks" type="button" class="secondary-btn">Restore all component defaults</button>
-                  <details class="technical-details">
-                    <summary>Estimate scope and design checks</summary>
-                    <ul id="estimate-warnings" class="recommendation-list"></ul>
-                    <p id="cost-model-note" class="field-help"></p>
-                    <h4>Before ordering stock</h4>
-                    <ul id="sizing-checklist" class="recommendation-list"></ul>
-                  </details>
-                  <details class="technical-details">
-                    <summary>Block roles and sizing rules</summary>
-                    <dl id="sizing-glossary" class="sizing-glossary"></dl>
-                    <ol id="sizing-steps" class="recommendation-list"></ol>
-                    <h4>Worked example: 100 mm wax sphere</h4>
-                    <p class="field-help">Two female halves enclose the sphere. Select Investment casting to calculate this example and edit its assumptions.</p>
-                    <div class="table-wrap"><table class="outputs-table"><tbody id="sizing-example"></tbody></table></div>
-                  </details>
-                </section>
-
-                <details class="technical-details">
-                  <summary>Cost breakdown &amp; technical calculation details</summary>
-                  <div class="details-body table-wrap">
-                    <table class="outputs-table" id="out-main">
-                      <tbody></tbody>
-                    </table>
-                  </div>
-                </details>
               </section>
 
             </aside>
@@ -541,6 +482,7 @@
               <a href="#rs-summary">Summary</a>
               <a href="#rs-cost">Cost</a>
               <a href="#rs-life">Tool life</a>
+              <a href="#rs-components">Components</a>
               <a href="#rs-steel">Tool steel</a>
               <a href="#rs-matrix">Route</a>
               <a href="#rs-process">Process</a>
@@ -602,6 +544,77 @@
 
               <ul id="rl-items" class="recommendation-list reason-list"></ul>
               <p id="rl-basis" class="field-help"></p>
+            </section>
+
+            <section id="rs-components" class="result-card components-card" aria-labelledby="components-heading">
+              <div class="result-card-header">
+                <h3 id="components-heading">Tool components and cost details</h3>
+                <p class="costing-basis">Costing basis:&nbsp;<strong id="out-c12">—</strong></p>
+              </div>
+                <details class="technical-details tooling-block-details" open>
+                  <summary>Tool block sizing</summary>
+                  <div class="details-body">
+                    <p id="tooling-sizing-basis" class="field-help standalone">
+                      Calculate to see the working-block sizing assumptions.
+                    </p>
+                    <p class="field-help">Scroll across the table to see stock, material and process details.</p>
+                    <div class="table-wrap" role="region" aria-label="Component stock and material details" tabindex="0">
+                      <table class="outputs-table block-table" id="out-blocks">
+                        <thead>
+                          <tr>
+                            <th>Component</th>
+                            <th>Role</th>
+                            <th>Pieces</th>
+                            <th>Raw stock</th>
+                            <th>Material / process note</th>
+                          </tr>
+                        </thead>
+                        <tbody></tbody>
+                      </table>
+                    </div>
+                  </div>
+                </details>
+              <div class="components-grid">
+                <div class="components-editors">
+                <section id="workbook-results" hidden>
+                  <p id="block-counts" class="field-help"></p>
+                  <p id="grade-summary" class="field-help"></p>
+                  <div class="section-title-row">
+                    <h3>Component inputs</h3>
+                    <span id="block-modified" class="summary-meta">Workbook defaults</span>
+                  </div>
+                  <div id="block-editors"></div>
+                  <button id="reset-blocks" type="button" class="secondary-btn">Restore all component defaults</button>
+                  <details class="technical-details">
+                    <summary>Estimate scope and design checks</summary>
+                    <ul id="estimate-warnings" class="recommendation-list"></ul>
+                    <p id="cost-model-note" class="field-help"></p>
+                    <h4>Before ordering stock</h4>
+                    <ul id="sizing-checklist" class="recommendation-list"></ul>
+                  </details>
+                  <details class="technical-details">
+                    <summary>Block roles and sizing rules</summary>
+                    <dl id="sizing-glossary" class="sizing-glossary"></dl>
+                    <ol id="sizing-steps" class="recommendation-list"></ol>
+                    <h4>Worked example: 100 mm wax sphere</h4>
+                    <p class="field-help">Two female halves enclose the sphere. Select Investment casting to calculate this example and edit its assumptions.</p>
+                    <div class="table-wrap"><table class="outputs-table"><tbody id="sizing-example"></tbody></table></div>
+                  </details>
+                </section>
+                  <p class="field-help components-empty">Component-level inputs are available for the detailed processes.</p>
+                </div>
+                <div class="components-breakdown">
+                  <details class="breakdown-details">
+                    <summary>Full cost breakdown and calculation values</summary>
+                    <p class="field-help">The grouped split is shown under "Where the money goes". This table lists every line and intermediate value.</p>
+                    <div class="table-wrap">
+<table class="outputs-table" id="out-main">
+                      <tbody></tbody>
+                    </table>
+                    </div>
+                  </details>
+                </div>
+              </div>
             </section>
 
             <section id="rs-steel" class="result-card" aria-labelledby="steel-heading">
