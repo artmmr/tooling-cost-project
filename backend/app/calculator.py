@@ -109,6 +109,10 @@ def calculate(
         return calculate_workbook(request)
     if request.block_overrides:
         raise ValueError("Component overrides are supported only for the detailed workbook processes.")
+    if force_material_family is None and request.force_tooling_material:
+        if request.tooling_material_family not in TOOLING_MATERIALS:
+            raise ValueError("Choose a known tooling material family to force.")
+        force_material_family = request.tooling_material_family
 
     # ---------------------------------------------------------
     # 1. Recommend tooling material
@@ -662,6 +666,7 @@ def calculate(
         road_transport_cost=road_transport_cost,
         sea_transport_cost=sea_transport_cost,
         final_markup=0,
+        costing_material_family=recommended_family,
         overhead_cost=overhead_cost,
         working_components_cost=working_cost,
         construction_cost=construction_cost,

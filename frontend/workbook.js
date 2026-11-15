@@ -230,5 +230,28 @@ const WorkbookUI = (() => {
     });
     document.getElementById("block-modified").textContent = Object.values(overrides).some(o => Object.keys(o).length) ? "Component inputs modified" : "Workbook defaults";
   }
-  return {init, current, onProcessChange, chooseBand, addState, render, refresh, escape};
+  /* Scenario support for "Try this" and Undo in the report. */
+  function exportOverrides() {
+    return JSON.parse(JSON.stringify(overrides));
+  }
+  function importOverrides(saved) {
+    overrides = JSON.parse(JSON.stringify(saved || {}));
+    editorKey = "";
+  }
+  function overrideCount() {
+    return Object.values(overrides).filter(o => Object.keys(o).length).length;
+  }
+  /* Price every machined component in one tooling material family. */
+  function setAllMaterial(family) {
+    for (const block of lastBlocks) {
+      if (block.purchased) continue;
+      const change = overrides[block.component_id] ||= {};
+      change.material_family = family;
+      delete change.tooling_material_assumptions;
+      delete change.manufacturing_route;
+    }
+    editorKey = "";
+  }
+  return {init, current, onProcessChange, chooseBand, addState, render, refresh, escape,
+          exportOverrides, importOverrides, overrideCount, setAllMaterial};
 })();

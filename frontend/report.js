@@ -48,11 +48,14 @@ const ReportUI = (() => {
     chip.dataset.stale = "true";
   }
 
+  const tryButton = (kind, value, label) =>
+    `<button type="button" class="try-btn" data-try-kind="${kind}" data-try-value="${escapeHtml(value)}" data-try-label="${escapeHtml(label)}">Try this</button>`;
+
   function bars(container, rows) {
     const max = Math.max(...rows.map(r => r.value || 0), 1);
     container.innerHTML = rows.map(r => `
       <div class="bar-row${r.current ? " current" : ""}">
-        <div class="bar-label"><span>${escapeHtml(r.label)}</span><strong>${r.text}</strong></div>
+        <div class="bar-label"><span>${escapeHtml(r.label)}${r.current ? ' <span class="current-tag">Your selection</span>' : ""}</span><strong>${r.text}</strong>${r.action || ""}</div>
         <div class="bar-track" aria-hidden="true"><div class="bar-fill" style="width:${Math.max(1.5, (r.value || 0) / max * 100).toFixed(1)}%"></div></div>
       </div>`).join("");
   }
@@ -64,7 +67,14 @@ const ReportUI = (() => {
       ${option.lifetime_price != null && option.replacements ? `<p class="option-meta">Lifetime ${price(option.lifetime_price)}: ${option.replacements} replacement set${option.replacements > 1 ? "s" : ""} over this quantity</p>` : ""}
       ${option.heat_treatment ? `<p class="option-meta">Needs heat treatment</p>` : ""}
       <ul>${option.reasons.map(r => `<li>${escapeHtml(r)}</li>`).join("")}</ul>
+      ${!option.is_current && option.family !== "workbook_mix" && option.price != null && option.fit !== "not_recommended"
+        ? `<footer>${tryButton("material", option.family, `Tool steel: ${option.name}`)}</footer>` : ""}
     </article>`;
+  }
+
+  /* Only processes the form offers can be tried (not "no dedicated tool" or unpriced routes). */
+  function processAvailable(code) {
+    return [...(document.getElementById("inp-process")?.options || [])].some(o => o.value === code);
   }
 
   function processCard(option, reference) {
@@ -81,6 +91,8 @@ const ReportUI = (() => {
       <p class="option-text"><strong>Strengths:</strong> ${escapeHtml(option.strengths)}</p>
       <p class="option-text"><strong>Limits:</strong> ${escapeHtml(option.limits)}</p>
       ${option.notes.length ? `<ul class="option-notes">${option.notes.map(n => `<li>${escapeHtml(n)}</li>`).join("")}</ul>` : ""}
+      ${!option.is_current && option.tooling_price != null && processAvailable(option.process)
+        ? `<footer>${tryButton("process", option.process, `Process: ${option.label}`)}</footer>` : ""}
     </article>`;
   }
 
@@ -124,7 +136,8 @@ const ReportUI = (() => {
       ? `${price(cheapest.price)}, ${fmt((1 - cheapest.price / current.price) * 100, 0)}% below ${current.name}`
       : "Your selected country";
 
-    bars($("rp-drivers"), report.cost_drivers.map(d => ({label: d.label, value: d.amount, text: `${price(d.amount)} · ${fmt(d.share * 100, 0)}%`})));
+    CostCharts.stacked($("rp-drivers"), report.cost_drivers, price);
+    CostCharts.perPart($("rp-quantity-chart"), report.quantity_options, price);
 
     $("rp-quantity").innerHTML = report.quantity_options.map(q => `
       <tr class="${q.is_current ? "current" : ""}">
@@ -154,6 +167,7 @@ const ReportUI = (() => {
     if (unpriced.length) $("rp-country-basis").textContent += ` Not compared without an exchange rate: ${unpriced.join(", ")}.`;
     bars($("rp-countries"), report.country_options.filter(c => c.price != null).map(c => ({
       label: c.currency === "USD" ? `${c.name} (costed in USD)` : c.name, value: c.price, current: c.is_current,
+      action: c.is_current ? "" : tryButton("country", c.code, `Country: ${c.name}`),
       text: `${price(c.price)}${c.is_current ? "" : " " + delta(c.price, current?.price)}`,
     })));
 
@@ -297,6 +311,7 @@ const ReportUI = (() => {
     set("inp-surface-finish", params.get("finish"));
     set("inp-truck", params.get("truck"));
     set("inp-sea", params.get("sea"));
+    set("inp-cooling", params.get("cooling"));
     await calculateAndRender();
     return true;
   }

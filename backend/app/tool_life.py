@@ -151,7 +151,7 @@ def estimate(request, result, family: str | None = None) -> ToolLife:
             items.append(LifeItem(component=block.component, life=life or 0, replacements=replacements,
                                   replacement_cost=replacements * block.cost_before_commercial * factor))
     else:
-        life = typical_life(process, family or result.recommended_material_family, workpiece, detail)
+        life = typical_life(process, family or result.costing_material_family or result.recommended_material_family, workpiece, detail)
         replacements = max(0, ceil(shots / life) - 1) if life else 0
         items.append(LifeItem(component="Cavity and core inserts", life=life or 0, replacements=replacements,
                               replacement_cost=replacements * result.working_components_cost * factor))

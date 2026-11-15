@@ -250,6 +250,9 @@ class CalculationRequest(BaseModel):
     assumptions: CostAssumptions
 
     tooling_material_family: str | None = None
+    # Use tooling_material_family even when the rules recommend another family
+    # (the report's "Try this material" action on broad-process estimates).
+    force_tooling_material: bool = False
 
     # US dollars per euro used by the client to convert USD country rates to EUR.
     # The calculator ignores it; the advanced report uses it to price the other
@@ -377,6 +380,8 @@ class CalculationResponse(BaseModel):
     recommended_material: str
 
     recommended_material_family: str
+    # Family actually used for costing (differs from the recommendation when forced).
+    costing_material_family: str = ""
 
     recommendation_confidence: str
 

@@ -284,7 +284,7 @@ def _for_process(request: CalculationRequest, process: str) -> CalculationReques
     """The same part, quantity and costs, made with another process (default tool sizing)."""
     quantity = _quantity(request)
     update = dict(process=ProcessType(process), block_overrides=[], sizing_mode="part_scaled",
-                  tooling_material_family=None, tooling_material_assumptions=None, manufacturing_route=None)
+                  tooling_material_family=None, tooling_material_assumptions=None, manufacturing_route=None, force_tooling_material=False)
     if is_workbook_process(process):
         update.update(expected_quantity=quantity)
     else:
@@ -480,9 +480,9 @@ def material_options(request: CalculationRequest, base: CalculationResponse,
                 result = _safe_price(variant)
                 life = tool_life_estimate(variant, result) if result else None
             else:
-                same = family == base.recommended_material_family
+                same = family == (base.costing_material_family or base.recommended_material_family)
                 result = base if same else _safe_price(request.model_copy(update=dict(
-                    tooling_material_family=None, tooling_material_assumptions=None, manufacturing_route=None)),
+                    tooling_material_family=None, tooling_material_assumptions=None, manufacturing_route=None, force_tooling_material=False)),
                     force_material_family=family)
                 life = tool_life_estimate(request, result, family=family) if result else None
             price = result.total_price if result else None
@@ -490,7 +490,7 @@ def material_options(request: CalculationRequest, base: CalculationResponse,
             family=family, name=profile.name, fit=FIT_FROM_SCORE[score], price=price,
             lifetime_price=life.lifetime_cost if price is not None and life else None,
             replacements=life.replacements if price is not None and life else 0,
-            is_current=not workbook and family == base.recommended_material_family,
+            is_current=not workbook and family == (base.costing_material_family or base.recommended_material_family),
             heat_treatment=profile.requires_heat_treatment,
             reasons=[FAMILY_NOTES[family], *reasons],
         ))

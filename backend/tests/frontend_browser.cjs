@@ -58,7 +58,9 @@ const closeTo = (a, b, message) => assert(Math.abs(a - b) < 1e-7 * Math.max(1, M
     const click = async locator => {await locator.evaluate(el => el.scrollIntoView({block:'center'})); await locator.click();};
     const check = async (name, test) => {await test(); console.log(`PASS ${++passed}: ${name}`);};
     await page.goto(`${url}/advanced.html`);
-    await page.waitForFunction(() => document.getElementById('calc-status').textContent === 'Ready to calculate.');
+    // The page calculates the default part on load; rates, freight and currency live in the Assumptions card.
+    await page.waitForFunction(() => document.getElementById('estimate-state').dataset.stale === 'false');
+    await page.evaluate(() => { document.getElementById('assumptions').open = true; });
 
     await check('Catalog, six bands, initial calculation and nautical miles', async () => {
       assert.equal(await page.locator('#inp-process option').count(),29);
@@ -130,8 +132,7 @@ const closeTo = (a, b, message) => assert(Math.abs(a - b) < 1e-7 * Math.max(1, M
       assert(!(await page.locator('#inp-l').isDisabled()));
     });
     await check('Country flags, ECB rate, USD-costed countries and pending overrides', async () => {
-      const countryDetails = page.locator('#inp-cnc3-rate').locator('xpath=ancestor::details[1]');
-      await click(countryDetails.locator('summary'));
+      assert(await page.locator('#inp-cnc3-rate').isVisible());
       await edit('inp-cnc3-rate',999);
       assert((await text('country-defaults-flag')).includes('modified'));
       await click(page.locator('#reset-country-defaults')); await ready();
@@ -218,12 +219,12 @@ const closeTo = (a, b, message) => assert(Math.abs(a - b) < 1e-7 * Math.max(1, M
       assert(!('expected_quantity' in latest()));
     });
     await check('Zero freight, restore, and whole-unit input arrows', async () => {
-      await click(page.locator('[data-tab="transport"]'));
+      // Freight settings are part of the Assumptions card (no separate Logistics tab).
       await edit('road-rate',0); await edit('sea-rate',0);
       assert((await text('freight-breakdown')).includes('Total freight: EUR 0.00'));
       await click(page.locator('#reset-logistics')); await ready();
       closeTo(Number(await value('road-rate')),5.6);
-      await click(page.locator('[data-tab="calc"]'));
+      assert.equal(await page.locator('[data-tab="transport"]').count(), 0);
       const sea = page.locator('#inp-sea'); await sea.fill('10'); await sea.press('ArrowUp'); await sea.blur(); await ready();
       assert.equal(await value('inp-sea'),'11');
       await edit('inp-process','die_casting'); await openComponent('P03-C01');
