@@ -113,9 +113,10 @@ TOOLING_MATERIALS = {
     ),
 
     "high_wear_cold_work_steel": ToolingMaterialProfile(
-        name="High-wear cold-work tool steel",
+        name="High-wear cold-work tool steel (PM / HSS)",
         density_kg_m3=7900,
-        block_price_per_tonne=3000,
+        # x2 x1.4 in the calculators gives about 22 EUR/kg: between M2 HSS (~12) and PM steels (25-60).
+        block_price_per_tonne=8000,
         removal_rate_cm3_min=1.9,
         milling_volume_factor=0.00042,
         milling_tool_price=90,
@@ -143,6 +144,25 @@ TOOLING_MATERIALS = {
             cnc_5_axis_share=0.20,
             edm_share=0.25,
             grinding_share=0.20,
+        ),
+    ),
+
+    # Sintered tungsten carbide: shaped by EDM and diamond grinding only.
+    "carbide": ToolingMaterialProfile(
+        name="Tungsten carbide (WC-Co)",
+        density_kg_m3=14500,
+        # x2 x1.4 gives about 70 EUR/kg for carbide blanks.
+        block_price_per_tonne=25000,
+        removal_rate_cm3_min=0.4,
+        milling_volume_factor=0.0002,
+        milling_tool_price=120,
+        requires_heat_treatment=False,
+        heat_treatment_eur_per_kg=0,
+        route=ManufacturingRouteDefaults(
+            cnc_3_axis_share=0.0,
+            cnc_5_axis_share=0.0,
+            edm_share=0.5,
+            grinding_share=0.5,
         ),
     ),
 }

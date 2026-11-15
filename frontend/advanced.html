@@ -1,0 +1,867 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Detailed Tooling Analysis</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=JetBrains+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+    <script src="common.js"></script>
+  </head>
+
+  <body>
+    <div class="app-shell">
+      <header class="app-header">
+        <div class="app-header-inner">
+          <a class="brand-link" href="index.html">
+            <span class="brand-mark" aria-hidden="true">TC</span>
+            <span class="brand-name">Tooling Cost Estimator</span>
+          </a>
+          <nav class="mode-nav" aria-label="Estimator mode">
+            <a href="basic.html">Quick price</a>
+            <a href="advanced.html" aria-current="page">Detailed analysis</a>
+          </nav>
+          <button type="button" class="theme-toggle" data-theme-toggle aria-label="Switch theme">
+            <svg class="icon-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.2M12 19.3v2.2M4.6 4.6l1.6 1.6M17.8 17.8l1.6 1.6M2.5 12h2.2M19.3 12h2.2M4.6 19.4l1.6-1.6M17.8 6.2l1.6-1.6"/></svg>
+            <svg class="icon-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.2 14.6A8.4 8.4 0 0 1 9.4 3.8a8.4 8.4 0 1 0 10.8 10.8Z"/></svg>
+          </button>
+        </div>
+      </header>
+      <div class="page-hero">
+        <p class="eyebrow">Detailed analysis</p>
+        <h1>Tooling cost and production report</h1>
+        <p class="header-copy">
+          Enter the part by hand or upload a drawing. The report compares tooling materials, part processes,
+          countries and quantities, and explains the risks and how to reduce them.
+        </p>
+      </div>
+
+      <nav class="tabs" aria-label="Sections">
+        <div class="tabs-inner">
+          <button type="button" data-tab="calc" aria-selected="true">Manual input</button>
+          <button type="button" data-tab="drawing" aria-selected="false">From drawing</button>
+          <button type="button" data-tab="transport" aria-selected="false">Logistics</button>
+        </div>
+      </nav>
+
+      <main>
+        <section id="panel-calc" class="panel active" aria-labelledby="calc-heading">
+          <div class="overview-grid">
+            <div class="input-column">
+              <div class="section-intro">
+                <div>
+                  <p class="eyebrow">Project inputs</p>
+                  <h2 id="calc-heading">Define the tooling requirement</h2>
+                </div>
+                <span class="status-chip">Editable</span>
+              </div>
+
+              <section class="input-card">
+                <div class="section-heading">
+                  <span class="step-number">01</span>
+                  <div>
+                    <h3>Production</h3>
+                    <p>Where and how the part will be manufactured.</p>
+                  </div>
+                </div>
+
+                <div class="form-grid two-col">
+                  <div class="field field-span-2">
+                    <label for="inp-country">Manufacturing country</label>
+                    <select id="inp-country"></select>
+                    <p class="field-help">Loads editable benchmark labor and machine rates.</p>
+                  </div>
+
+                  <div class="field">
+                    <label for="inp-process">Manufacturing process</label>
+                    <select id="inp-process"></select>
+                  </div>
+
+                  <div class="field">
+                    <label for="inp-pqty" id="sets-label">Parts per mold / tool</label>
+                    <select id="inp-pqty"></select>
+                  </div>
+
+                  <div class="field">
+                    <label for="inp-cycles" id="quantity-band-label">Tool life band</label>
+                    <select id="inp-cycles"></select>
+                  </div>
+
+                  <div class="field">
+                    <label for="inp-expected-cycles" id="quantity-label">Expected production cycles</label>
+                    <input id="inp-expected-cycles" type="number" min="1" step="1" />
+                  </div>
+                </div>
+              </section>
+
+              <section class="input-card">
+                <div class="section-heading">
+                  <span class="step-number">02</span>
+                  <div>
+                    <h3>Workpiece</h3>
+                    <p>Material and envelope of the part being produced.</p>
+                  </div>
+                </div>
+
+                <div class="form-grid two-col">
+                  <div class="field field-span-2">
+                    <label for="inp-workpiece-material">Part material</label>
+                    <select id="inp-workpiece-material"></select>
+                  </div>
+
+                  <div class="field field-span-2">
+                    <label for="inp-material-detail">Material grade and form <span class="unit">process matrix</span></label>
+                    <select id="inp-material-detail"><option value="">Automatic (from part material)</option></select>
+                    <p class="field-help">Picks the row of the process and tooling matrix used for route and tool-grade advice, for example ABS, PA or zinc.</p>
+                  </div>
+
+                  <div class="field field-span-2" id="material-thickness-field">
+                    <label for="inp-material-thickness">Material thickness <span class="unit">mm</span></label>
+                    <input id="inp-material-thickness" type="number" min="0" step="1" />
+                    <p class="field-help">Wall or sheet thickness. Core envelopes may use this value.</p>
+                  </div>
+                </div>
+
+                <div class="dimension-block">
+                  <div class="mini-heading">Part dimensions <span class="unit">mm</span></div>
+                  <div class="dim-row">
+                    <div class="field">
+                      <label for="inp-l">Length</label>
+                      <input id="inp-l" type="number" min="1" step="1" />
+                    </div>
+                    <div class="field">
+                      <label for="inp-w">Width</label>
+                      <input id="inp-w" type="number" min="1" step="1" />
+                    </div>
+                    <div class="field">
+                      <label for="inp-h">Height</label>
+                      <input id="inp-h" type="number" min="1" step="1" />
+                    </div>
+                  </div>
+                </div>
+                <p id="part-shape-note" class="field-help"></p>
+                <div id="workbook-inputs" hidden>
+                  <div class="field">
+                    <label for="inp-sizing-mode">Block sizing basis</label>
+                    <select id="inp-sizing-mode">
+                      <option value="part_scaled">Custom part: adapt reference envelopes</option>
+                      <option value="reference">Exact reference example</option>
+                    </select>
+                  </div>
+                  <p id="reference-scope" class="field-help"></p>
+                  <button id="use-reference-part" type="button" class="secondary-btn">Restore example geometry</button>
+                </div>
+              </section>
+
+              <section class="input-card">
+                <div class="section-heading">
+                  <span class="step-number">03</span>
+                  <div>
+                    <h3>Tool requirements</h3>
+                    <p>Precision, finish and operating conditions that influence material selection.</p>
+                  </div>
+                </div>
+
+                <div class="form-grid two-col">
+                  <div class="field">
+                    <label for="inp-tolerance">Tolerance requirement</label>
+                    <select id="inp-tolerance">
+                      <option value="standard">Standard</option>
+                      <option value="precision">Precision</option>
+                      <option value="high_precision">High precision</option>
+                    </select>
+                  </div>
+
+                  <div class="field">
+                    <label for="inp-surface-finish">Surface finish</label>
+                    <select id="inp-surface-finish">
+                      <option value="standard">Standard</option>
+                      <option value="high">High</option>
+                      <option value="optical">Optical / very high finish</option>
+                    </select>
+                  </div>
+
+                  <div class="field field-span-2">
+                    <label for="inp-cooling">Cooling system</label>
+                    <select id="inp-cooling"></select>
+                  </div>
+                </div>
+
+                <details class="details-card compact-details">
+                  <summary>
+                    <span>Advanced tooling conditions</span>
+                    <span class="summary-meta">Optional</span>
+                  </summary>
+                  <div class="details-body">
+                    <p class="field-help standalone">
+                      Known material characteristics are detected automatically. Use these controls only to add an extra abrasive or corrosive condition.
+                    </p>
+                    <div class="form-grid two-col">
+                      <div class="field">
+                        <label for="inp-abrasive">Abrasive environment</label>
+                        <select id="inp-abrasive">
+                          <option value="false">No additional abrasive condition</option>
+                          <option value="true">Yes</option>
+                        </select>
+                      </div>
+                      <div class="field">
+                        <label for="inp-corrosive">Corrosive environment</label>
+                        <select id="inp-corrosive">
+                          <option value="false">No additional corrosive condition</option>
+                          <option value="true">Yes</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                </details>
+              </section>
+
+              <section class="input-card">
+                <div class="section-heading">
+                  <span class="step-number">04</span>
+                  <div>
+                    <h3>Logistics</h3>
+                    <p>Transport assumptions applied to the tooling weight.</p>
+                  </div>
+                </div>
+
+                <div class="form-grid two-col">
+                  <div class="field">
+                    <label for="inp-truck">Truck distance <span class="unit">km</span></label>
+                    <input id="inp-truck" type="number" min="0" step="1" />
+                  </div>
+                  <div class="field">
+                    <label for="inp-sea">Sea distance <span class="unit">nautical miles</span></label>
+                    <input id="inp-sea" type="number" min="0" step="1" />
+                  </div>
+                </div>
+              </section>
+
+              <section class="input-card">
+                <h3>Currency</h3>
+                <p id="currency-note" class="field-help">European countries are costed in EUR. China and India are costed in USD.</p>
+                <div class="form-grid two-col">
+                  <div class="field"><label for="inp-fx">US dollars per 1 euro</label><input id="inp-fx" type="number" min="0" step="1" placeholder="Loading ECB rate…" /></div>
+                  <div class="field"><label for="inp-fx-date">Exchange rate date</label><input id="inp-fx-date" type="date" /></div>
+                </div>
+                <p id="fx-source" class="field-help" aria-live="polite">Loading the European Central Bank reference rate…</p>
+                <button id="fx-reset" type="button" class="secondary-btn" hidden>Use the ECB rate</button>
+              </section>
+              <details class="details-card cost-assumptions">
+                <summary>
+                  <span>Advanced manufacturing cost assumptions</span>
+                  <span id="country-defaults-flag" class="summary-meta">Country defaults</span>
+                </summary>
+                <div class="details-body">
+                  <div class="inline-callout">
+                    These benchmark values are loaded from the selected country profile and remain fully editable. Modified fields are highlighted. The engineering rate prices tool design, electricity prices machine energy, and overhead and supplier margin form the commercial layer of the price.
+                  </div>
+
+                  <div class="assumption-section">
+                    <div class="mini-heading">Engineering &amp; labor</div>
+                    <div class="form-grid two-col">
+                      <div class="field">
+                        <label for="inp-engineering-rate">Engineering rate <span class="unit">€/h</span></label>
+                        <input id="inp-engineering-rate" type="number" min="0" step="1" />
+                      </div>
+                      <div class="field">
+                        <label for="inp-assembly-rate">Assembly / operator <span class="unit">€/h</span></label>
+                        <input id="inp-assembly-rate" type="number" min="0" step="1" />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="assumption-section">
+                    <div class="mini-heading">Machining rates</div>
+                    <div class="form-grid two-col">
+                      <div class="field">
+                        <label for="inp-cnc3-rate">CNC 3-axis <span class="unit">€/h</span></label>
+                        <input id="inp-cnc3-rate" type="number" min="0" step="1" />
+                      </div>
+                      <div class="field">
+                        <label for="inp-cnc5-rate">CNC 5-axis <span class="unit">€/h</span></label>
+                        <input id="inp-cnc5-rate" type="number" min="0" step="1" />
+                      </div>
+                      <div class="field">
+                        <label for="inp-edm-rate">Electro-Discharge Machining <span class="unit">€/h</span></label>
+                        <input id="inp-edm-rate" type="number" min="0" step="1" />
+                      </div>
+                      <div class="field">
+                        <label for="inp-grinding-rate">Grinding <span class="unit">€/h</span></label>
+                        <input id="inp-grinding-rate" type="number" min="0" step="1" />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="assumption-section">
+                    <div class="mini-heading">Energy &amp; efficiency</div>
+                    <div class="form-grid three-col">
+                      <div class="field">
+                        <label for="inp-electricity">Electricity <span class="unit">€/kWh</span></label>
+                        <input id="inp-electricity" type="number" min="0" step="1" />
+                      </div>
+                      <div class="field">
+                        <label for="inp-machine-efficiency">Machine efficiency <span class="unit">%</span></label>
+                        <input id="inp-machine-efficiency" type="number" min="1" max="100" step="1" />
+                      </div>
+                      <div class="field">
+                        <label for="inp-operator-efficiency">Operator efficiency <span class="unit">%</span></label>
+                        <input id="inp-operator-efficiency" type="number" min="1" max="100" step="1" />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="assumption-section">
+                    <div class="mini-heading">Commercial assumptions</div>
+                    <div class="form-grid two-col">
+                      <div class="field">
+                        <label for="inp-overhead-rate">Overhead <span class="unit">%</span></label>
+                        <input id="inp-overhead-rate" type="number" min="0" max="100" step="1" />
+                      </div>
+                      <div class="field">
+                        <label for="inp-margin-rate">Supplier margin <span class="unit">%</span></label>
+                        <input id="inp-margin-rate" type="number" min="0" max="100" step="1" />
+                      </div>
+                    </div>
+                  </div>
+
+                  <button id="reset-country-defaults" type="button" class="secondary-btn">
+                    Restore country defaults
+                  </button>
+                </div>
+              </details>
+
+              <div class="calculate-bar">
+                <div class="calculate-status-wrap">
+                  <span class="status-dot" aria-hidden="true"></span>
+                  <p id="calc-status" class="calc-status" aria-live="polite"></p>
+                </div>
+                <button id="calculate-btn" type="button" class="calculate-btn">
+                  Calculate tooling cost
+                </button>
+              </div>
+            </div>
+
+            <aside class="results-column">
+              <section class="result-card price-card">
+                <div class="result-card-header">
+                  <div>
+                    <p class="eyebrow">Should-cost estimate</p>
+                    <h2 id="price-heading">Tooling price</h2>
+                  </div>
+                  <span id="estimate-state" class="status-chip accent" aria-live="polite">Not calculated</span>
+                </div>
+
+                <div class="price-hero">
+                  <span class="currency">€</span>
+                  <strong id="out-total">—</strong>
+                </div>
+                <p class="price-caption">Estimated tooling price · <span id="result-currency">EUR</span></p>
+                <p id="estimate-scope" class="estimate-warning" role="status"></p>
+
+                <div class="result-summary-grid">
+                  <div class="summary-tile wide">
+                    <span>Costing material</span>
+                    <strong id="out-c12">—</strong>
+                  </div>
+                  <div class="summary-tile wide">
+                    <span>Maximum individual stock dimensions</span>
+                    <strong id="out-c13">—</strong>
+                  </div>
+                </div>
+
+                <div class="model-note">
+                  Complete-tool estimate: working components plus construction hours, design, tool base and standard parts, assembly and tryout. Hot runners and machine-specific automation are not included. Component quantities, material benchmarks and routes can be reviewed below.
+                </div>
+
+                <details class="technical-details tooling-block-details" open>
+                  <summary>Tool block sizing</summary>
+                  <div class="details-body">
+                    <p id="tooling-sizing-basis" class="field-help standalone">
+                      Calculate to see the working-block sizing assumptions.
+                    </p>
+                    <p class="field-help">Scroll across the table to see stock, material and process details.</p>
+                    <div class="table-wrap" role="region" aria-label="Component stock and material details" tabindex="0">
+                      <table class="outputs-table block-table" id="out-blocks">
+                        <thead>
+                          <tr>
+                            <th>Component</th>
+                            <th>Role</th>
+                            <th>Pieces</th>
+                            <th>Raw stock</th>
+                            <th>Material / process note</th>
+                          </tr>
+                        </thead>
+                        <tbody></tbody>
+                      </table>
+                    </div>
+                  </div>
+                </details>
+
+                <section id="workbook-results" hidden>
+                  <p id="block-counts" class="field-help"></p>
+                  <p id="grade-summary" class="field-help"></p>
+                  <div class="section-title-row">
+                    <h3>Component inputs</h3>
+                    <span id="block-modified" class="summary-meta">Workbook defaults</span>
+                  </div>
+                  <div id="block-editors"></div>
+                  <button id="reset-blocks" type="button" class="secondary-btn">Restore all component defaults</button>
+                  <details class="technical-details">
+                    <summary>Estimate scope and design checks</summary>
+                    <ul id="estimate-warnings" class="recommendation-list"></ul>
+                    <p id="cost-model-note" class="field-help"></p>
+                    <h4>Before ordering stock</h4>
+                    <ul id="sizing-checklist" class="recommendation-list"></ul>
+                  </details>
+                  <details class="technical-details">
+                    <summary>Block roles and sizing rules</summary>
+                    <dl id="sizing-glossary" class="sizing-glossary"></dl>
+                    <ol id="sizing-steps" class="recommendation-list"></ol>
+                    <h4>Worked example: 100 mm wax sphere</h4>
+                    <p class="field-help">Two female halves enclose the sphere. Select Investment casting to calculate this example and edit its assumptions.</p>
+                    <div class="table-wrap"><table class="outputs-table"><tbody id="sizing-example"></tbody></table></div>
+                  </details>
+                </section>
+
+                <details class="technical-details">
+                  <summary>Cost breakdown &amp; technical calculation details</summary>
+                  <div class="details-body table-wrap">
+                    <table class="outputs-table" id="out-main">
+                      <tbody></tbody>
+                    </table>
+                  </div>
+                </details>
+              </section>
+
+              <section class="result-card recommendation-card">
+                <div class="result-card-header">
+                  <div>
+                    <p class="eyebrow">Engineering recommendation</p>
+                    <h2>Tooling strategy</h2>
+                  </div>
+                  <strong id="rec-confidence" class="confidence-badge">—</strong>
+                </div>
+
+                <p id="confidence-explanation" class="field-help">Calculate to see how closely your inputs match the material-selection rules.</p>
+                <p class="field-help">Confidence describes the rule match, not a measured probability or a guarantee of tool life. Selection reasons appear below.</p>
+                <div class="material-hero">
+                  <span>Recommended material</span>
+                  <strong id="rec-material">—</strong>
+                </div>
+
+                <details id="legacy-tooling-assumptions" class="details-card tooling-assumptions" open>
+                  <summary>
+                    <span>Material &amp; manufacturing assumptions</span>
+                    <span class="summary-meta">Editable</span>
+                  </summary>
+                  <div class="details-body">
+                    <p class="field-help standalone">
+                      Recommended benchmark values are loaded automatically. Edit them when you have supplier-specific data.
+                    </p>
+
+                    <div class="mini-heading">Material assumptions</div>
+                    <div class="form-grid two-col">
+                      <div class="field">
+                        <label for="inp-tool-density">Density <span class="unit">kg/m³</span></label>
+                        <input id="inp-tool-density" type="number" min="1" step="1" />
+                      </div>
+                      <div class="field">
+                        <label for="inp-tool-price">Material price <span class="unit">€/t</span></label>
+                        <input id="inp-tool-price" type="number" min="0" step="1" />
+                      </div>
+                      <div class="field">
+                        <label for="inp-tool-mrr">Removal rate <span class="unit">cm³/min</span></label>
+                        <input id="inp-tool-mrr" type="number" min="0" step="1" />
+                      </div>
+                      <div class="field">
+                        <label for="inp-milling-volume-factor">Milling volume factor</label>
+                        <input id="inp-milling-volume-factor" type="number" min="0" step="1" />
+                      </div>
+                      <div class="field">
+                        <label for="inp-milling-tool-price">Milling tool price <span class="unit">€</span></label>
+                        <input id="inp-milling-tool-price" type="number" min="0" step="1" />
+                      </div>
+                      <div class="field">
+                        <label for="inp-heat-treatment">Heat treatment <span class="unit">€/kg</span></label>
+                        <input id="inp-heat-treatment" type="number" min="0" step="1" />
+                      </div>
+                    </div>
+
+                    <div class="route-heading-row">
+                      <div class="mini-heading">Manufacturing route allocation</div>
+                      <div class="route-total-pill">Total <strong id="route-total">100%</strong></div>
+                    </div>
+
+                    <div class="form-grid two-col route-grid">
+                      <div class="field">
+                        <label for="inp-route-cnc3">CNC 3-axis <span class="unit">%</span></label>
+                        <input id="inp-route-cnc3" type="number" min="0" max="100" step="1" />
+                      </div>
+                      <div class="field">
+                        <label for="inp-route-cnc5">CNC 5-axis <span class="unit">%</span></label>
+                        <input id="inp-route-cnc5" type="number" min="0" max="100" step="1" />
+                      </div>
+                      <div class="field">
+                        <label for="inp-route-edm">Electro-Discharge Machining <span class="unit">%</span></label>
+                        <input id="inp-route-edm" type="number" min="0" max="100" step="1" />
+                      </div>
+                      <div class="field">
+                        <label for="inp-route-grinding">Grinding <span class="unit">%</span></label>
+                        <input id="inp-route-grinding" type="number" min="0" max="100" step="1" />
+                      </div>
+                    </div>
+
+                    <button id="reset-tooling-defaults" type="button" class="secondary-btn">
+                      Restore recommended defaults
+                    </button>
+                  </div>
+                </details>
+
+                <div class="recommendation-section">
+                  <div class="section-title-row">
+                    <h3>Potential risks during production</h3>
+                    <span class="mini-badge">Risk drivers</span>
+                  </div>
+                  <p class="field-help">Potential tooling risks associated with your material and production requirements. These are possible issues, not predicted failures.</p>
+                  <ul id="rec-failure-modes" class="recommendation-list risk-list">
+                    <li>Calculate to generate recommendation.</li>
+                  </ul>
+                </div>
+
+                <div class="recommendation-section">
+                  <h3>Why this material?</h3>
+                  <ul id="rec-reasons" class="recommendation-list reason-list">
+                    <li>Calculate to generate recommendation.</li>
+                  </ul>
+                </div>
+
+                <div class="recommendation-section route-section">
+                  <h3>Recommended tooling manufacturing route</h3>
+                  <ol id="rec-operations" class="recommendation-list recommendation-route">
+                    <li>Calculate to generate recommendation.</li>
+                  </ol>
+                </div>
+
+                <div class="model-note small">
+                  Material selection and manufacturing-route recommendations are generated from the process, tool-life target, workpiece material and identified failure risks.
+                </div>
+              </section>
+            </aside>
+          </div>
+          <section id="report" class="report" aria-labelledby="report-heading" hidden>
+            <div class="section-intro report-intro">
+              <div>
+                <p class="eyebrow">Production report</p>
+                <h2 id="report-heading">How to make it, and what it costs</h2>
+              </div>
+              <span id="report-state" class="status-chip accent">Up to date</span>
+            </div>
+
+            <div class="report-kpis">
+              <div class="kpi"><span>Tooling price</span><strong id="rk-price">—</strong><small id="rk-price-note"></small></div>
+              <div class="kpi"><span>Tooling cost per part</span><strong id="rk-per-part">—</strong><small id="rk-per-part-note"></small></div>
+              <div class="kpi"><span>Best-fit tooling material</span><strong id="rk-material">—</strong><small id="rk-material-note"></small></div>
+              <div class="kpi"><span>Lowest-cost country</span><strong id="rk-country">—</strong><small id="rk-country-note"></small></div>
+            </div>
+
+            <section class="result-card ai-card" aria-labelledby="ai-heading">
+              <div class="result-card-header">
+                <div>
+                  <p class="eyebrow">AI summary</p>
+                  <h3 id="ai-heading">Recommendations in plain words</h3>
+                </div>
+                <button id="ai-btn" type="button" class="secondary-btn ai-btn">Write AI summary</button>
+              </div>
+              <p id="ai-status" class="field-help" aria-live="polite">Writes a short summary of this report. It uses only the figures calculated here, and takes about 5–15 seconds.</p>
+              <div id="ai-output" class="ai-output" hidden>
+                <p id="ai-headline" class="ai-headline"></p>
+                <h4>Recommendations</h4>
+                <ul id="ai-recommendations" class="recommendation-list reason-list"></ul>
+                <h4>Watch out for</h4>
+                <ul id="ai-watch" class="recommendation-list risk-list"></ul>
+                <p id="ai-model" class="field-help"></p>
+              </div>
+            </section>
+
+            <div class="report-grid">
+              <section class="result-card" aria-labelledby="drivers-heading">
+                <p class="eyebrow">Cost structure</p>
+                <h3 id="drivers-heading">Where the money goes</h3>
+                <div id="rp-drivers" class="bar-list"></div>
+              </section>
+              <section class="result-card" aria-labelledby="quantity-heading">
+                <p class="eyebrow">Quantity</p>
+                <h3 id="quantity-heading">Tool cost by production quantity</h3>
+                <p class="field-help">Higher quantities need more durable tooling and, beyond the tool's life, replacement working components. Lifetime = first tool + replacements; the cost per part spreads the lifetime cost over the quantity shown.</p>
+                <div class="table-wrap" role="region" aria-label="Tool cost by quantity" tabindex="0">
+                  <table class="outputs-table compare-table">
+                    <thead><tr><th>Quantity band</th><th class="num">Tool price</th><th class="num">Lifetime</th><th class="num">Per part</th></tr></thead>
+                    <tbody id="rp-quantity"></tbody>
+                  </table>
+                </div>
+              </section>
+            </div>
+
+            <section class="result-card" aria-labelledby="life-heading">
+              <p class="eyebrow">Tool life</p>
+              <h3 id="life-heading">How long the tool lasts, and what the whole run costs</h3>
+              <div class="report-kpis life-kpis">
+                <div class="kpi"><span>Typical life of working parts</span><strong id="rl-life">—</strong><small id="rl-life-note"></small></div>
+                <div class="kpi"><span>Replacement sets</span><strong id="rl-replacements">—</strong><small id="rl-replacements-note"></small></div>
+                <div class="kpi"><span>Lifetime tooling cost</span><strong id="rl-lifetime">—</strong><small id="rl-lifetime-note"></small></div>
+              </div>
+              <ul id="rl-items" class="recommendation-list reason-list"></ul>
+              <p id="rl-basis" class="field-help"></p>
+            </section>
+
+            <section class="result-card" aria-labelledby="materials-heading">
+              <p class="eyebrow">Tooling material</p>
+              <h3 id="materials-heading">Which tooling material is better?</h3>
+              <p id="rp-material-basis" class="field-help"></p>
+              <div id="rp-materials" class="option-grid"></div>
+              <details class="technical-details">
+                <summary id="rp-materials-hidden-summary">Not recommended for this process</summary>
+                <div id="rp-materials-hidden" class="option-grid"></div>
+              </details>
+            </section>
+
+            <section class="result-card matrix-card" aria-labelledby="matrix-heading">
+              <div class="result-card-header">
+                <div>
+                  <p class="eyebrow">Process and tooling matrix</p>
+                  <h3 id="matrix-heading">Recommended route for your material and quantity</h3>
+                </div>
+                <span id="rp-matrix-chip" class="status-chip"></span>
+              </div>
+              <p id="rp-matrix-summary" class="matrix-summary"></p>
+              <div id="rp-matrix-body">
+                <div class="table-wrap" role="region" aria-label="Process and tooling by quantity" tabindex="0">
+                  <table class="outputs-table compare-table matrix-table">
+                    <thead><tr><th>Quantity band</th><th>Production route</th><th>Tooling</th></tr></thead>
+                    <tbody id="rp-matrix-bands"></tbody>
+                  </table>
+                </div>
+                <h4 class="mini-heading">Tool grades for your quantity</h4>
+                <dl id="rp-matrix-grades" class="risk-table"></dl>
+              </div>
+            </section>
+
+            <section class="result-card" aria-labelledby="processes-heading">
+              <p class="eyebrow">Part production</p>
+              <h3 id="processes-heading">Which process should make the part?</h3>
+              <p class="field-help">The same part and quantity, with the tooling priced for each process that suits the part material. Piece cost (cycle time, material and labour per part) is not calculated; the piece-cost level is a general guide.</p>
+              <div id="rp-processes" class="option-grid"></div>
+            </section>
+
+            <div class="report-grid">
+              <section class="result-card" aria-labelledby="countries-heading">
+                <p class="eyebrow">Sourcing</p>
+                <h3 id="countries-heading">Where is the tool cheapest?</h3>
+                <p id="rp-country-basis" class="field-help"></p>
+                <div id="rp-countries" class="bar-list"></div>
+              </section>
+              <section class="result-card" aria-labelledby="risks-heading">
+                <p class="eyebrow">Risks</p>
+                <h3 id="risks-heading">Risks and how to reduce them</h3>
+                <dl id="rp-risks" class="risk-table"></dl>
+              </section>
+            </div>
+
+            <section class="result-card" aria-labelledby="design-heading">
+              <p class="eyebrow">Design and ordering</p>
+              <h3 id="design-heading">Advice before you order</h3>
+              <ul id="rp-design" class="recommendation-list reason-list"></ul>
+              <ul id="rp-method" class="method-notes"></ul>
+            </section>
+          </section>
+        </section>
+
+        <section id="panel-drawing" class="panel" aria-labelledby="drawing-heading">
+          <div class="drawing-shell">
+            <div class="section-intro">
+              <div>
+                <p class="eyebrow">Drawing to estimate</p>
+                <h2 id="drawing-heading">Estimate tooling cost from a part drawing</h2>
+              </div>
+              <span id="drawing-state" class="status-chip accent" aria-live="polite">No drawing</span>
+            </div>
+
+            <div class="drawing-grid">
+              <section class="input-card drawing-upload-card">
+                <div class="section-heading">
+                  <span class="step-number">01</span>
+                  <div>
+                    <h3>Upload drawing</h3>
+                    <p>PDF, PNG, JPG, WEBP, TIFF, BMP or GIF · up to 15 MB</p>
+                  </div>
+                </div>
+
+                <div id="drop-zone" class="drop-zone" role="button" tabindex="0" aria-describedby="drop-zone-hint">
+                  <svg class="drop-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4m0 0-4.5 4.5M12 4l4.5 4.5M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  <strong>Drop a drawing here</strong>
+                  <span>or <span class="link-like">browse your computer</span></span>
+                  <span id="drop-zone-hint" class="drop-hint">You can also paste a screenshot (Ctrl+V / ⌘V).</span>
+                </div>
+                <p id="drawing-upload-error" class="upload-error" role="alert" hidden></p>
+                <input id="drawing-file" type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.tif,.tiff,.bmp,.gif,application/pdf,image/*" hidden />
+
+                <div id="drawing-preview" class="drawing-preview" hidden>
+                  <div id="drawing-preview-frame" class="drawing-preview-frame"></div>
+                  <div class="drawing-file-row">
+                    <span id="drawing-file-name" class="drawing-file-name"></span>
+                    <button id="drawing-replace" type="button" class="secondary-btn">Upload another</button>
+                  </div>
+                </div>
+
+                <p class="field-help">The drawing is sent to the configured AI model for reading. CAD-exported PDFs give the most reliable result: their values are cross-checked against the text inside the PDF.</p>
+              </section>
+
+              <section class="input-card drawing-results-card">
+                <div class="section-heading">
+                  <span class="step-number">02</span>
+                  <div>
+                    <h3>Check recognized values</h3>
+                    <p>Overall part envelope in millimetres. Every value stays editable.</p>
+                  </div>
+                </div>
+
+                <div id="drawing-empty" class="drawing-empty">Upload a drawing to read its dimensions.</div>
+                <div id="drawing-loading" class="drawing-loading" hidden>
+                  <span class="spinner" aria-hidden="true"></span>
+                  <span id="drawing-loading-text">Reading drawing…</span>
+                </div>
+                <div id="drawing-error" class="drawing-error" role="alert" hidden></div>
+
+                <div id="drawing-fields" hidden>
+                  <p id="drawing-part-name" class="drawing-part-name"></p>
+                  <div class="drawing-dims">
+                    <div class="field">
+                      <label for="drawing-l">Length <span class="unit">mm</span></label>
+                      <input id="drawing-l" type="number" min="0" step="any" />
+                      <p id="drawing-l-source" class="dim-source"></p>
+                    </div>
+                    <div class="field">
+                      <label for="drawing-w">Width <span class="unit">mm</span></label>
+                      <input id="drawing-w" type="number" min="0" step="any" />
+                      <p id="drawing-w-source" class="dim-source"></p>
+                    </div>
+                    <div class="field">
+                      <label for="drawing-h">Height <span class="unit">mm</span></label>
+                      <input id="drawing-h" type="number" min="0" step="any" />
+                      <p id="drawing-h-source" class="dim-source"></p>
+                    </div>
+                  </div>
+                  <div class="form-grid two-col">
+                    <div class="field">
+                      <label for="drawing-t">Wall / material thickness <span class="unit">mm</span></label>
+                      <input id="drawing-t" type="number" min="0" step="any" />
+                      <p id="drawing-t-source" class="dim-source"></p>
+                    </div>
+                    <div class="field">
+                      <label for="drawing-material">Part material</label>
+                      <select id="drawing-material"></select>
+                      <p id="drawing-material-source" class="dim-source"></p>
+                    </div>
+                  </div>
+                  <ul id="drawing-warnings" class="drawing-warnings"></ul>
+                  <details class="technical-details drawing-all-dims">
+                    <summary id="drawing-all-dims-summary">All dimensions read</summary>
+                    <div class="details-body">
+                      <div class="table-wrap" role="region" aria-label="All dimensions read from the drawing" tabindex="0">
+                        <table class="outputs-table">
+                          <thead><tr><th>As printed</th><th>Unit</th><th>View</th><th>Measures</th><th>Check</th></tr></thead>
+                          <tbody id="drawing-all-dims"></tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </details>
+                  <p id="drawing-model" class="field-help"></p>
+                </div>
+              </section>
+            </div>
+
+            <section class="input-card drawing-cost-card">
+              <div class="section-heading">
+                <span class="step-number">03</span>
+                <div>
+                  <h3>Calculate tooling cost</h3>
+                  <p>These settings are shared with Manual input, where all other assumptions can be edited.</p>
+                </div>
+              </div>
+              <div class="drawing-cost-grid">
+                <div class="form-grid two-col">
+                  <div class="field">
+                    <label for="drawing-country">Manufacturing country</label>
+                    <select id="drawing-country" data-mirror="inp-country"></select>
+                  </div>
+                  <div class="field">
+                    <label for="drawing-process">Manufacturing process</label>
+                    <select id="drawing-process" data-mirror="inp-process"></select>
+                  </div>
+                  <div class="field field-span-2">
+                    <label for="drawing-pqty" data-label-from="sets-label">Parts per mold / tool</label>
+                    <select id="drawing-pqty" data-mirror="inp-pqty"></select>
+                  </div>
+                  <div class="field">
+                    <label for="drawing-cycles" data-label-from="quantity-band-label">Tool life band</label>
+                    <select id="drawing-cycles" data-mirror="inp-cycles"></select>
+                  </div>
+                  <div class="field">
+                    <label for="drawing-expected" data-label-from="quantity-label">Expected production cycles</label>
+                    <input id="drawing-expected" type="number" min="1" step="1" data-mirror="inp-expected-cycles" />
+                  </div>
+                </div>
+                <div class="drawing-cost-result">
+                  <button id="drawing-calc-btn" type="button" class="calculate-btn" disabled>Use these values &amp; calculate</button>
+                  <p id="drawing-calc-status" class="field-help" aria-live="polite">Upload a drawing first.</p>
+                  <div id="drawing-cost" class="drawing-cost" hidden>
+                    <span class="eyebrow">Estimated tooling price</span>
+                    <div class="price-hero"><span id="drawing-cost-currency" class="currency">€</span><strong id="drawing-cost-total">—</strong></div>
+                    <p id="drawing-cost-detail" class="price-caption"></p>
+                    <p id="drawing-cost-scope" class="estimate-warning"></p>
+                    <button id="drawing-open-breakdown" type="button" class="secondary-btn">Open the full report</button>
+                  </div>
+                </div>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <section id="panel-transport" class="panel" aria-labelledby="transport-heading">
+          <div class="reference-shell">
+            <div class="section-intro reference-intro">
+              <div>
+                <p class="eyebrow">Logistics assumptions</p>
+                <h2 id="transport-heading">Transport parameters</h2>
+              </div>
+            </div>
+            <div class="reference-card">
+              <p class="reference-copy">Distances are entered under Manual input. Freight prices below apply to one vehicle or sea load. The estimate allocates them to the tooling weight, or charges whole loads.</p>
+              <div class="form-grid two-col">
+<div class="field"><label for="road-rate">Road freight rate <span class="unit">€/vehicle-km</span></label><input id="road-rate" type="number" min="0" step="1" value="5.6" /></div><div class="field"><label for="sea-rate">Sea freight rate <span class="unit">€/load-nautical mile</span></label><input id="sea-rate" type="number" min="0" step="1" value="0.7482828282828283" /></div><div class="field"><label for="road-load">Road load capacity <span class="unit">kg</span></label><input id="road-load" type="number" min="0" step="1" value="18000" /></div><div class="field"><label for="sea-load">Sea load capacity <span class="unit">kg</span></label><input id="sea-load" type="number" min="0" step="1" value="27000" /></div><div class="field"><label for="road-journeys">Charged road journeys <span class="unit"></span></label><input id="road-journeys" type="number" min="1" step="1" value="2" /></div><div class="field"><label for="sea-journeys">Charged sea journeys <span class="unit"></span></label><input id="sea-journeys" type="number" min="1" step="1" value="2" /></div>
+              <div class="field field-span-2"><label for="freight-allocation">Freight allocation</label><select id="freight-allocation"><option value="proportional">Proportional share by weight</option><option value="whole_load">Whole loads (rounded up)</option></select></div>
+              </div>
+              <p class="field-help">Two charged journeys preserve the original estimate’s ×2 factor. Change this to match your shipment. Proportional allocation may differ from a carrier’s minimum charge.</p>
+              <button id="reset-logistics" class="secondary-btn" type="button">Restore freight defaults</button>
+              <div id="freight-breakdown" class="model-note" aria-live="polite">Calculate to see road and sea freight costs.</div>
+              <p class="field-help">Freight = distance × rate × load allocation × charged journeys. Freight is passed through at cost, without overhead or margin.</p>
+              <p id="logistics-status" class="field-help" aria-live="polite"></p>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script src="workbook.js"></script>
+    <script src="app.js"></script>
+    <script src="report.js"></script>
+  </body>
+</html>

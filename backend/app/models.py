@@ -251,6 +251,16 @@ class CalculationRequest(BaseModel):
 
     tooling_material_family: str | None = None
 
+    # US dollars per euro used by the client to convert USD country rates to EUR.
+    # The calculator ignores it; the advanced report uses it to price the other
+    # USD countries consistently with the user's rate.
+    eur_to_usd: float | None = Field(default=None, gt=0, allow_inf_nan=False)
+
+    # Optional Industrialisation Process & Tooling Matrix row (material grade and
+    # form, e.g. "abs_thermoplastic"). Used by the advanced report only; when it is
+    # missing the row is derived from the part material and process.
+    part_material_detail: str | None = Field(default=None, max_length=80)
+
     tooling_material_assumptions: (
         ToolingMaterialAssumptions | None
     ) = None
@@ -350,6 +360,18 @@ class CalculationResponse(BaseModel):
     heat_treatment_cost: float
 
     total_price: float
+
+    # Complete-tool layer (see app/complete_tool.py)
+    working_components_cost: float = 0
+    construction_cost: float = 0
+    construction_hours: float = 0
+    design_cost: float = 0
+    design_hours: float = 0
+    standard_parts_cost: float = 0
+    standard_parts_note: str = ""
+    assembly_tryout_cost: float = 0
+    energy_cost: float = 0
+    overhead_cost: float = 0
 
     # Recommendation output
     recommended_material: str

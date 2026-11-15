@@ -169,7 +169,9 @@ class WorkbookTests(unittest.TestCase):
             component_id="P20-C03", purchased_unit_cost_eur=1200, purchased_unit_weight_kg=30)]))
         self.assertTrue(quoted.estimate_complete)
         self.assertEqual(quoted.purchased_assemblies_cost, 1200)
-        self.assertAlmostEqual(quoted.total_price - base.total_price, 1200 * 1.25 * 1.1)
+        a = workbook_request("sheet_hydroforming").assumptions
+        # A supplier quote carries overhead and margin only; it is not part of the standard-parts share.
+        self.assertAlmostEqual(quoted.total_price - base.total_price, 1200 * (1 + a.overhead_rate) * (1 + a.margin_rate))
         self.assertAlmostEqual(quoted.tooling_weight_kg - base.tooling_weight_kg, 30)
         zero = calculate(workbook_request("sheet_hydroforming", block_overrides=[dict(
             component_id="P20-C03", purchased_unit_cost_eur=0, purchased_unit_weight_kg=0)]))
@@ -219,10 +221,17 @@ class WorkbookTests(unittest.TestCase):
 
     def test_cost_breakdown_reconciles(self):
         result = calculate(workbook_request("progressive_die_stamping", truck_distance_km=100, sea_distance_nm=200))
-        before_markup = sum(getattr(result, key) for key in ["material_cost", "transformation_cost", "outside_machining_cost",
-            "inside_machining_cost", "milling_tool_cost", "heat_treatment_cost", "cooling_cost", "purchased_assemblies_cost",
-            "margin", "handling_cost", "transport_cost"])
-        self.assertAlmostEqual(result.total_price, before_markup + result.final_markup)
+        working = sum(getattr(result, key) for key in ["material_cost", "transformation_cost", "outside_machining_cost",
+            "inside_machining_cost", "milling_tool_cost", "heat_treatment_cost", "construction_cost"])
+        self.assertAlmostEqual(result.working_components_cost, working)
+        total = sum(getattr(result, key) for key in ["working_components_cost", "purchased_assemblies_cost", "cooling_cost",
+            "energy_cost", "design_cost", "standard_parts_cost", "assembly_tryout_cost", "overhead_cost", "margin",
+            "transport_cost"])
+        self.assertAlmostEqual(result.total_price, total)
+        a = workbook_request().assumptions
+        cost_base = total - result.overhead_cost - result.margin - result.transport_cost
+        self.assertAlmostEqual(result.overhead_cost, cost_base * a.overhead_rate)
+        self.assertAlmostEqual(result.margin, (cost_base + result.overhead_cost) * a.margin_rate)
 
 
 if __name__ == "__main__":

@@ -93,17 +93,8 @@ const WorkbookUI = (() => {
       loadPart();
       document.getElementById("inp-pqty").value = "1";
       document.getElementById("inp-sizing-mode").value = "part_scaled";
-      const plastic = ["plastic_extrusion", "blow_molding", "compression_molding", "transfer_molding", "rotational_molding"];
-      const composite = ["composite_molding", "pultrusion"];
-      const options = composite.includes(p.code) ? [{value:"fiber_composite", label:"Fiber composite"}, ...PLASTIC_MATERIALS] : plastic.includes(p.code) ? PLASTIC_MATERIALS : [
-        ...METAL_MATERIALS, {value:"cast_aluminum", label:"Casting / extrusion aluminum"},
-        {value:"cast_iron", label:"Cast iron"}, {value:"metal_powder", label:"Metal powder / binder"},
-      ];
-      fillSelect("inp-workpiece-material", options);
-      const preferred = {die_casting:"cast_aluminum", metal_extrusion:"cast_aluminum", sand_casting:"cast_iron", investment_casting:"stainless_steel",
-        plastic_extrusion:"corrosive_polymer", compression_molding:"thermoset", transfer_molding:"thermoset",
-        powder_metallurgy:"metal_powder", metal_injection_molding:"metal_powder", composite_molding:"fiber_composite", pultrusion:"fiber_composite", spinning:"aluminum_sheet"};
-      document.getElementById("inp-workpiece-material").value = preferred[p.code] || (plastic.includes(p.code) ? "standard_thermoplastic" : "mild_steel");
+      fillSelect("inp-workpiece-material", workbookMaterials(p.code));
+      document.getElementById("inp-workpiece-material").value = workbookPreferredMaterial(p.code);
       syncBand();
     } else {
       fillSelect("inp-cycles", LISTS.cycles);
@@ -186,7 +177,7 @@ const WorkbookUI = (() => {
       <p id="block-route-${id}" class="field-help"></p><button type="button" class="secondary-btn" data-reset-component="${id}">Restore this component</button></div></details>`;
   }
   function render(result) {
-    document.getElementById("price-heading").textContent = result.calculation_basis === "workbook_v4" ? "Working-tool estimate" : "Tooling price";
+    document.getElementById("price-heading").textContent = "Tooling price";
     document.getElementById("estimate-scope").textContent = result.estimate_complete === false ? "Partial subtotal: a required assembly is missing price or shipping weight." : "";
     if (result.calculation_basis !== "workbook_v4") return;
     document.getElementById("block-counts").textContent = `${result.total_machined_blocks} machined blocks; ${result.total_purchased_assemblies} purchased assemblies. Maximum individual stock dimensions are not an assembled tool envelope.`;

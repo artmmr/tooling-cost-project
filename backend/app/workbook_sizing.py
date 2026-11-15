@@ -117,6 +117,44 @@ def custom_envelope(record, part, thickness):
     return dict(zip(SIZING_KEYS[:3], (x, y, z)))
 
 
+# Tools that carry cavity or forming pressure need walls and backing that grow with the part.
+PRESSURE_PROCESSES = {
+    "die_casting", "closed_die_forging", "compression_molding", "transfer_molding", "metal_injection_molding",
+    "powder_metallurgy", "punching_blanking", "fine_blanking", "progressive_die_stamping", "tube_hydroforming",
+    "sheet_hydroforming",
+}
+# In molds the core plate mates with the cavity plate, so plain cores scale too.
+MOLD_PROCESSES = {"die_casting", "compression_molding", "transfer_molding", "metal_injection_molding"}
+
+
+def scales_with_part(process, role):
+    """Dies and cavities carry the pressure; punches, pins and plungers are the shape itself."""
+    role = role.upper()
+    if role.startswith("FEMALE"):
+        return True
+    return process in MOLD_PROCESSES and role in {"MALE", "MALE / CORE SIDE"}
+SIDE_SHARE, BACKING_SHARE, DEPTH_SHARE = 0.15, 0.12, 0.5
+
+
+def minimum_reserves(inputs, override, reference_inputs):
+    """Scale-aware minimum steel around a working envelope (custom parts larger than the reference).
+
+    Rule of thumb for planning: side walls at least 15 % of the cavity span and
+    backing at least 12 % of the span or half the cavity depth. The workbook's
+    values stay authoritative for its reference part and remain the minimum;
+    explicit overrides win.
+    """
+    span = max(inputs["nominal_length_mm"], inputs["nominal_width_mm"])
+    reference_span = max(reference_inputs["nominal_length_mm"], reference_inputs["nominal_width_mm"])
+    if span <= reference_span * 1.05 and inputs["nominal_depth_mm"] <= reference_inputs["nominal_depth_mm"] * 1.05:
+        return
+    for key in ("side_reserve_x_mm", "side_reserve_y_mm"):
+        if key not in override:
+            inputs[key] = max(inputs[key], SIDE_SHARE * span)
+    if "backing_mm" not in override:
+        inputs["backing_mm"] = max(inputs["backing_mm"], BACKING_SHARE * span, DEPTH_SHARE * inputs["nominal_depth_mm"])
+
+
 def size_blocks(request):
     process = request.process.value
     quantity = request.expected_quantity or request.expected_cycles
@@ -151,6 +189,8 @@ def size_blocks(request):
             # Missing sheet thickness has a defined reference value only for solid examples.
             thickness = request.material_thickness_mm
             inputs.update(custom_envelope(record, request.part, thickness))
+            if process in PRESSURE_PROCESSES and scales_with_part(process, record["role"]):
+                minimum_reserves(inputs, override, record["inputs"])
         inputs.update({k: override[k] for k in SIZING_KEYS if k in override})
         if any(inputs[k] <= 0 for k in SIZING_KEYS[:3]):
             raise ValueError(f"{record['component']}: working envelope must be positive. Check part dimensions and wall thickness.")

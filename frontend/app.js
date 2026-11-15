@@ -1,220 +1,6 @@
-const API_BASE_URL =
-  globalThis.TOOLING_API_BASE_URL || "https://tooling-cost-project.onrender.com";
-
-
 let currentToolingDefaults = null;
 let currentToolingMaterialFamily = null;
 let currentCountryDefaults = null;
-
-
-/* =========================================================
-   Lists
-   ========================================================= */
-
-const LISTS = {
-  cycles: [
-    {
-      value: "up_to_10000",
-      label: "Up to 10,000 cycles",
-    },
-    {
-      value: "10000_to_100000",
-      label: "10,000 to 100,000 cycles",
-    },
-    {
-      value: "100000_to_250000",
-      label: "100,000 to 250,000 cycles",
-    },
-  ],
-
-  processes: [
-    {
-      value: "plastic_molding",
-      label: "Plastic Molding",
-    },
-    {
-      value: "plastic_injection",
-      label: "Plastic Injection",
-    },
-    {
-      value: "foaming",
-      label: "Foaming",
-    },
-    {
-      value: "thermoforming",
-      label: "Thermoforming",
-    },
-    {
-      value: "metal_molding",
-      label: "Metal Molding",
-    },
-    {
-      value: "stamping",
-      label: "Stamping",
-    },
-    {
-      value: "forming",
-      label: "Forming",
-    },
-    {
-      value: "deep_drawing",
-      label: "Deep Drawing",
-    },
-  ],
-
-  partsPerMold: Array.from(
-    { length: 30 },
-    (_, i) => i + 1,
-  ),
-
-  cooling: [
-    {
-      value: "false",
-      label: "No",
-    },
-    {
-      value: "true",
-      label: "Yes",
-    },
-  ],
-};
-
-
-const PLASTIC_PROCESSES = new Set([
-  "plastic_molding",
-  "plastic_injection",
-  "foaming",
-  "thermoforming",
-]);
-
-
-const METAL_PROCESSES = new Set([
-  "metal_molding",
-  "stamping",
-  "forming",
-  "deep_drawing",
-]);
-
-
-const PLASTIC_MATERIALS = [
-  {
-    value: "standard_thermoplastic",
-    label: "Standard thermoplastic",
-  },
-  {
-    value: "glass_filled_thermoplastic",
-    label: "Glass-filled thermoplastic",
-  },
-  {
-    value: "mineral_filled_thermoplastic",
-    label: "Mineral-filled thermoplastic",
-  },
-  {
-    value: "corrosive_polymer",
-    label: "Corrosive / aggressive polymer",
-  },
-  {
-    value: "thermoset",
-    label: "Thermoset",
-  },
-  {
-    value: "elastomer",
-    label: "Elastomer",
-  },
-  {
-    value: "other",
-    label: "Other",
-  },
-];
-
-
-const METAL_MATERIALS = [
-  {
-    value: "mild_steel",
-    label: "Mild steel",
-  },
-  {
-    value: "high_strength_steel",
-    label: "High-strength steel",
-  },
-  {
-    value: "advanced_high_strength_steel",
-    label: "Advanced high-strength steel (AHSS)",
-  },
-  {
-    value: "stainless_steel",
-    label: "Stainless steel",
-  },
-  {
-    value: "aluminum_sheet",
-    label: "Aluminum",
-  },
-  {
-    value: "copper_brass",
-    label: "Copper / brass",
-  },
-  {
-    value: "other",
-    label: "Other",
-  },
-];
-
-
-const CYCLE_DEFAULTS = {
-  up_to_10000: 5000,
-  "10000_to_100000": 50000,
-  "100000_to_250000": 150000,
-};
-
-
-/* =========================================================
-   Formatting
-   ========================================================= */
-
-function fmt(number, decimals = 2) {
-  if (
-    typeof number !== "number" ||
-    Number.isNaN(number)
-  ) {
-    return "—";
-  }
-
-  return number.toLocaleString(
-    undefined,
-    {
-      minimumFractionDigits: decimals,
-      maximumFractionDigits: decimals,
-    },
-  );
-}
-
-
-/* =========================================================
-   Generic select helper
-   ========================================================= */
-
-function fillSelect(id, options) {
-  const element =
-    document.getElementById(id);
-
-  element.innerHTML = options
-    .map((option) => {
-      if (typeof option === "object") {
-        return `
-          <option value="${option.value}">
-            ${option.label}
-          </option>
-        `;
-      }
-
-      return `
-        <option value="${option}">
-          ${option}
-        </option>
-      `;
-    })
-    .join("");
-}
 
 
 /* =========================================================
@@ -261,14 +47,20 @@ async function loadCountryDefaults(countryCode) {
     const response = await fetch(`${API_BASE_URL}/api/countries/${countryCode}`);
     if (!response.ok) throw new Error("Could not load country benchmark assumptions.");
     const profile = await response.json();
+    await ensureEcbRate();
     if (token !== countryRevision) return;
     captureMoney();
     currentCountryDefaults = profile;
-    displayCurrency = EUROPEAN_COUNTRIES.has(countryCode) ? "EUR" : "USD";
+    // China and India are costed in USD; their default rates are USD amounts.
+    countryCurrency = profile.currency || (EUROPEAN_COUNTRIES.has(countryCode) ? "EUR" : "USD");
+    displayCurrency = countryCurrency;
+    applyEcbRate();
     updateCurrencyDisplay();
     applyCountryDefaults(profile);
     countryLoading = false;
-    setStatus(currencyFactor() ? `${profile.name} defaults loaded. Prices in ${displayCurrency}.` : "Enter an exchange rate and date to calculate in USD.");
+    setStatus(currencyFactor()
+      ? `${profile.name} defaults loaded. Prices in ${displayCurrency}.`
+      : "The exchange rate could not be loaded. Enter a EUR/USD rate and its date to calculate in USD.");
     scheduleCalculation();
   } catch (error) {
     if (token !== countryRevision) return;
@@ -1331,30 +1123,18 @@ async function renderResult(
       "money",
     ],
 
-    [
-      "Cooling system cost",
-      result.cooling_cost,
-      "money",
-    ],
-
-    [
-      "Margin",
-      result.margin,
-      "money",
-    ],
-
-    [
-      "Handling cost",
-      result.handling_cost,
-      "money",
-    ],
-
-    [
-      "Transport & packaging",
-      result.transport_cost,
-      "money",
-    ],
-    ["Final commercial markup", result.final_markup, "money"],
+    ["Construction hours (programming, finishing, EDM, fitting) [h]", result.construction_hours, "number"],
+    ["Construction cost", result.construction_cost, "money"],
+    ["Working components subtotal", result.working_components_cost, "money"],
+    [result.standard_parts_note || "Tool base and standard parts", result.standard_parts_cost, "money"],
+    ["Cooling system cost", result.cooling_cost, "money"],
+    ["Design and engineering [h]", result.design_hours, "number"],
+    ["Design and engineering", result.design_cost, "money"],
+    ["Assembly and tryout", result.assembly_tryout_cost, "money"],
+    ["Machine energy", result.energy_cost, "money"],
+    ["Overhead", result.overhead_cost, "money"],
+    ["Supplier margin", result.margin, "money"],
+    ["Transport & packaging", result.transport_cost, "money"],
   ];
 
   const tbody =
@@ -1537,7 +1317,7 @@ async function calculateAndRender() {
     setLoading(true);
     markStale("Updating estimate…");
     setStatus("Updating estimate…");
-    const result = await requestCalculation(state, controller.signal);
+    const {result, report} = await ReportUI.request(state, controller.signal);
     if (revision !== inputRevision) return;
     const familyChanged = currentToolingMaterialFamily !== result.recommended_material_family;
     const hadFamily = Boolean(currentToolingMaterialFamily);
@@ -1555,6 +1335,7 @@ async function calculateAndRender() {
     }
     await renderResult(result);
     if (revision !== inputRevision) return;
+    ReportUI.render(report, state);
     hasCalculated = true;
     const badge = document.getElementById("estimate-state");
     badge.textContent = "Up to date";
@@ -1649,6 +1430,16 @@ function setupEvents() {
       scheduleCalculation();
     }
   });
+  document.getElementById("inp-material-detail").addEventListener("change", () => {
+    ProcessMatrix.syncWorkpiece("inp-material-detail", "inp-workpiece-material");
+  });
+  document.getElementById("fx-reset").addEventListener("click", () => {
+    captureMoney();
+    applyEcbRate(true);
+    updateCurrencyDisplay();
+    updateCountryFlags();
+    scheduleCalculation();
+  });
   document.getElementById("reset-logistics").addEventListener("click", () => {
     restoreLogistics();
     scheduleCalculation();
@@ -1665,10 +1456,11 @@ function setupEvents() {
     element.addEventListener(eventName, () => {
       if (element.id === "inp-country") return;
       if (element.id === "inp-fx" || element.id === "inp-fx-date") {
+        fxEdited = true;
         captureMoney();
         updateCurrencyDisplay();
-      } else if (MONEY_FIELDS.includes(element.id) && shownFactor) {
-        canonicalMoney[element.id] = Number(element.value) / shownFactor;
+      } else if (MONEY_FIELDS.includes(element.id) && fieldFactor(element.id)) {
+        canonicalMoney[element.id] = Number(element.value) / fieldFactor(element.id);
       }
       updateCountryFlags();
       updateRouteTotal();
@@ -1806,6 +1598,12 @@ async function init() {
     );
 
     await WorkbookUI.init();
+    try {
+      await ProcessMatrix.load();
+      ProcessMatrix.fill("inp-material-detail");
+    } catch {
+      // Route advice still uses the automatic mapping on the server.
+    }
     document.getElementById("inp-process").value = "die_casting";
     WorkbookUI.onProcessChange();
 
@@ -1817,10 +1615,10 @@ async function init() {
 
     setupTabs();
 
-
-    setStatus(
-      "Ready to calculate.",
-    );
+    // A link from the quick-price page carries the part and calculates straight away.
+    if (!(await ReportUI.applyUrlPrefill())) {
+      setStatus("Ready to calculate.");
+    }
   } catch (error) {
     console.error(
       error,
@@ -1840,7 +1638,6 @@ async function init() {
    ========================================================= */
 
 // The API's monetary contract remains EUR. Currency conversion is an explicit view layer.
-const EUROPEAN_COUNTRIES = new Set(["DE", "FR", "AT", "CZ", "SK", "HU", "PL", "ES", "IT"]);
 const COUNTRY_FIELDS = {
   "inp-engineering-rate": "engineering_rate", "inp-assembly-rate": "assembly_rate",
   "inp-cnc3-rate": "cnc_3_axis_rate", "inp-cnc5-rate": "cnc_5_axis_rate",
@@ -1853,7 +1650,9 @@ const PERCENT_FIELDS = new Set(["inp-machine-efficiency", "inp-operator-efficien
 const MONEY_FIELDS = [...Object.keys(COUNTRY_FIELDS).filter(id => !PERCENT_FIELDS.has(id)),
   "inp-tool-price", "inp-milling-tool-price", "inp-heat-treatment", "road-rate", "sea-rate"];
 const canonicalMoney = {"road-rate": 1400 / 250, "sea-rate": 8000 / 19800 * 1.852};
-let displayCurrency = "EUR", shownFactor = 1;
+let displayCurrency = "EUR", countryCurrency = "EUR", shownFactor = 1;
+// ECB reference rate loaded from the API; the visitor may override it with their own agreed rate.
+let ecbRate = null, ecbRequest = null, fxEdited = false;
 let hasCalculated = false, calculationTimer, inputRevision = 0, activeCalculation;
 let countryRevision = 0, countryLoading = false;
 const RISK_HELP = {
@@ -1866,7 +1665,10 @@ const RISK_HELP = {
   "chipping": "Small pieces can break away from tool edges under load.",
   "cracking": "Repeated or severe loads can cause cracks in the tool.",
   "plastic deformation": "High contact loads can permanently change the tool's shape.",
-  "high mechanical loading": "High forces increase stress on punches, dies and forming surfaces."
+  "high mechanical loading": "High forces increase stress on punches, dies and forming surfaces.",
+  "thermal fatigue": "Heating and cooling with every shot causes fine surface cracks (heat checking).",
+  "soldering": "Molten aluminium can bond to the die steel and tear the part surface.",
+  "erosion": "Fast metal flow at the gates can wash away die steel."
 };
 function sentenceCase(text) {
   const expanded = String(text).replace(/\bEDM\b/g, "Electro-Discharge Machining");
@@ -1881,20 +1683,52 @@ function money(euros) {
   const factor = currencyFactor();
   return factor && Number.isFinite(euros) ? `${displayCurrency} ${fmt(euros * factor)}` : "—";
 }
+/* Money fields keep their amount in their own currency: country rates in the country's
+   costing currency (USD for China and India), benchmarks and freight in EUR. */
+function isCountryMoney(id) {
+  return id in COUNTRY_FIELDS && !PERCENT_FIELDS.has(id);
+}
+function fieldFactor(id) {
+  return isCountryMoney(id) && countryCurrency === displayCurrency ? 1 : shownFactor;
+}
 function captureMoney() {
-  if (!shownFactor) return;
   MONEY_FIELDS.forEach(id => {
     const field = document.getElementById(id);
-    if (field.value !== "") canonicalMoney[id] = Number(field.value) / shownFactor;
+    const factor = fieldFactor(id);
+    if (field.value !== "" && factor) canonicalMoney[id] = Number(field.value) / factor;
   });
 }
 function showMoneyFields(ids = MONEY_FIELDS) {
   ids.forEach(id => {
     const field = document.getElementById(id);
-    field.disabled = !shownFactor;
+    const factor = fieldFactor(id);
+    field.disabled = !factor;
     const base = canonicalMoney[id];
-    field.value = shownFactor && Number.isFinite(base) ? Number((base * shownFactor).toPrecision(12)) : "";
+    field.value = factor && Number.isFinite(base) ? Number((base * factor).toPrecision(12)) : "";
   });
+}
+async function ensureEcbRate() {
+  ecbRequest ||= fetchJson("/api/fx/eur-usd").then(rate => (ecbRate = rate)).catch(() => {
+    ecbRequest = null; // Try again on the next country change.
+    return null;
+  });
+  return ecbRequest;
+}
+function applyEcbRate(force = false) {
+  if (!ecbRate || (fxEdited && !force)) return;
+  document.getElementById("inp-fx").value = ecbRate.rate;
+  document.getElementById("inp-fx-date").value = ecbRate.date;
+  fxEdited = false;
+}
+function describeRate() {
+  const rate = document.getElementById("inp-fx").value;
+  const day = document.getElementById("inp-fx-date").value;
+  const fromEcb = ecbRate && !fxEdited && Number(rate) === ecbRate.rate && day === ecbRate.date;
+  document.getElementById("fx-source").textContent = fromEcb
+    ? `Rate source: ${ecbRate.source}, ${ecbRate.date}${ecbRate.stale ? " (the ECB could not be reached just now, so this is the last rate loaded)" : ""}.`
+    : rate && day ? `Your own rate, dated ${day}.${ecbRate ? ` The latest ECB rate is ${ecbRate.rate} (${ecbRate.date}).` : ""}`
+      : "The ECB rate could not be loaded. Enter your agreed rate and its date.";
+  document.getElementById("fx-reset").hidden = !ecbRate || fromEcb;
 }
 function updateCurrencyDisplay() {
   shownFactor = currencyFactor();
@@ -1906,9 +1740,10 @@ function updateCurrencyDisplay() {
   document.querySelector(".price-hero .currency").textContent = displayCurrency === "EUR" ? "€" : "$";
   document.getElementById("result-currency").textContent = displayCurrency;
   document.getElementById("currency-note").textContent = displayCurrency === "EUR"
-    ? "Prices are displayed in EUR for this European manufacturing country."
-    : shownFactor ? `Prices are displayed in USD. 1 EUR = ${shownFactor} USD, rate dated ${document.getElementById("inp-fx-date").value}.`
-      : "Prices will be displayed in USD. Enter an exchange rate and date to continue.";
+    ? "This European country is costed in EUR. The rate below converts US-dollar countries in the report's country comparison."
+    : shownFactor ? `This country is costed in USD: its labour and machine rates are US-dollar amounts. Tool steel, heat treatment and freight benchmarks are in EUR and are converted at 1 EUR = ${shownFactor} USD.`
+      : "This country is costed in USD. Enter a EUR/USD rate and its date to continue.";
+  describeRate();
   // Never relabel an old numeric result as a different currency.
   document.getElementById("out-total").textContent = "—";
   document.querySelector("#out-main tbody").replaceChildren();
@@ -1940,7 +1775,7 @@ function updateCountryFlags() {
     const modified = !Number.isFinite(value) || Math.abs(value - currentCountryDefaults[key]) > 1e-8;
     field.classList.toggle("modified", modified);
     const base = currentCountryDefaults[key];
-    field.title = `Country default: ${PERCENT_FIELDS.has(id) ? fmt(base * 100) + "%" : money(base)}${modified ? " (modified)" : ""}`;
+    field.title = `Country default: ${PERCENT_FIELDS.has(id) ? fmt(base * 100) + "%" : `${countryCurrency} ${fmt(base)}`}${modified ? " (modified)" : ""}`;
     if (modified) count++;
   });
   const flag = document.getElementById("country-defaults-flag");
@@ -1962,6 +1797,10 @@ function readState() {
     road_journeys: number("road-journeys"), sea_journeys: number("sea-journeys"),
     allocation: document.getElementById("freight-allocation").value
   };
+  const detail = document.getElementById("inp-material-detail").value;
+  if (detail) state.part_material_detail = detail;
+  const eurToUsd = Number(document.getElementById("inp-fx").value);
+  if (Number.isFinite(eurToUsd) && eurToUsd > 0) state.eur_to_usd = eurToUsd;
   WorkbookUI.addState(state);
   return state;
 }
@@ -1995,10 +1834,6 @@ const DRAWING_CHECK_LABELS = {
   no_text_layer: "not cross-checked",
 };
 const drawing = {request: null, result: null, previewUrl: null, timer: null, materialChoice: null};
-
-function escapeHtml(value) {
-  return String(value ?? "").replace(/[&<>"']/g, char => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"})[char]);
-}
 
 function setDrawingState(text) {
   document.getElementById("drawing-state").textContent = text;
@@ -2128,7 +1963,7 @@ async function readDrawing(file) {
     showDrawingSection("error");
     document.getElementById("drawing-error").textContent = `Could not read the drawing: ${error.message}`;
     setDrawingState("Failed");
-    document.getElementById("drawing-calc-status").textContent = "Upload a drawing first, or enter dimensions on Overview.";
+    document.getElementById("drawing-calc-status").textContent = "Upload a drawing first, or enter dimensions under Manual input.";
   } finally {
     if (drawing.request === controller) {
       drawing.request = null;
@@ -2165,7 +2000,7 @@ function renderDrawingResult(result) {
   }
   const thickness = document.getElementById("drawing-t");
   thickness.value = result.wall_thickness ? round(result.wall_thickness.value_mm) : document.getElementById("inp-material-thickness").value;
-  document.getElementById("drawing-t-source").innerHTML = dimensionSourceHtml(result.wall_thickness, "Not a thin-walled part on the drawing; current Overview value kept.");
+  document.getElementById("drawing-t-source").innerHTML = dimensionSourceHtml(result.wall_thickness, "Not a thin-walled part on the drawing; current Manual input value kept.");
 
   drawing.materialChoice = result.material?.workpiece_material || null;
   syncDrawingMirrors();
@@ -2256,7 +2091,7 @@ async function calculateFromDrawing() {
   cost.classList.remove("stale");
   cost.hidden = false;
   setDrawingState("Estimated");
-  status.textContent = "Estimate updated. The full breakdown is on Overview.";
+  status.textContent = "Estimate updated. The full breakdown and production report are under Manual input.";
 }
 
 function setupDrawingImport() {
@@ -2312,6 +2147,7 @@ function setupDrawingImport() {
 }
 
 function markStale(message = "Estimate out of date") {
+  ReportUI.markStale();
   const badge = document.getElementById("estimate-state");
   badge.textContent = message;
   badge.dataset.stale = "true";

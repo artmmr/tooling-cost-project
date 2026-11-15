@@ -473,6 +473,7 @@ def _scaled(value: float, source: float, target: float) -> float:
 
 
 def _build_component(
+    process: str,
     rule: BlockSizingRule,
     part_length_mm: float,
     part_width_mm: float,
@@ -496,8 +497,17 @@ def _build_component(
         part_height_mm,
     )
 
-    finished_l = envelope_l * (1 + rule.enlargement) + 2 * rule.reserve_x_mm
-    finished_h = envelope_h * (1 + rule.enlargement) + rule.backing_mm
+    # Scale-aware minimum steel around the cavity (side walls 15 % of the span,
+    # backing 12 % of the span or half the cavity depth); small parts keep the rule values.
+    # Only dies and cavities (and mold cores); punches are the cutting shape itself.
+    scales = rule.role.upper().startswith("FEMALE") or (
+        rule.role.upper() == "MALE" and process in {"plastic_injection", "plastic_molding", "metal_molding", "foaming"})
+    span = max(envelope_l, envelope_w) if scales else 0
+    reserve_x = max(rule.reserve_x_mm, 0.15 * span)
+    reserve_y = max(rule.reserve_y_mm, 0.15 * span)
+    backing = max(rule.backing_mm, 0.12 * span, 0.5 * envelope_h if scales else 0)
+    finished_l = envelope_l * (1 + rule.enlargement) + 2 * reserve_x
+    finished_h = envelope_h * (1 + rule.enlargement) + backing
 
     if rule.stock_form == "Round billet":
         finished_w = None
@@ -507,7 +517,7 @@ def _build_component(
         raw_volume = 3.141592653589793 * (raw_l / 2) ** 2 * raw_h / 1_000_000_000
         finished_volume = 3.141592653589793 * (finished_l / 2) ** 2 * finished_h / 1_000_000_000
     else:
-        finished_w = envelope_w * (1 + rule.enlargement) + 2 * rule.reserve_y_mm
+        finished_w = envelope_w * (1 + rule.enlargement) + 2 * reserve_y
         raw_l = _round_up(finished_l + 2 * rule.allowance_mm, rule.rounding_increment_mm)
         raw_w = _round_up(finished_w + 2 * rule.allowance_mm, rule.rounding_increment_mm)
         raw_h = _round_up(finished_h + 2 * rule.allowance_mm, rule.rounding_increment_mm)
@@ -550,6 +560,7 @@ def build_tooling_sizing(
     tooling_concept = TOOLING_CONCEPTS[process][quantity_band]
     components = [
         _build_component(
+            process=process,
             rule=rule,
             part_length_mm=part_length_mm,
             part_width_mm=part_width_mm,
