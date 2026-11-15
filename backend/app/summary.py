@@ -70,6 +70,7 @@ SUMMARY_SCHEMA = {
 INSTRUCTIONS = (
     "You are a tooling cost engineer. Using ONLY the JSON facts, write advice for a buyer.\n"
     "headline: 1 sentence, the price and the main cost driver.\n"
+    "If tool_life shows replacement sets, mention them and the lifetime cost.\n"
     "recommendations: 3-4 items, each 1-2 sentences: best tooling material, part process choice, "
     "cheapest country and quantity strategy, citing numbers from the facts; follow process_matrix when present.\n"
     "watch_outs: 2-3 short items from risks and notes.\n"
@@ -125,6 +126,10 @@ def build_facts(report: AdvancedReport, request: CalculationRequest, currency: s
         "country": request.manufacturing_country,
         "tool_price": _r(base.total_price, factor),
         "tool_cost_per_part": _r(report.tooling_per_part, factor),
+        "tool_life": ({"typical_life_cycles": report.tool_life.life, "cycles_per_tool": report.tool_life.shots,
+                       "replacement_sets": report.tool_life.replacements,
+                       "lifetime_tooling_cost": _r(report.tool_life.lifetime_cost, factor)}
+                      if report.tool_life.modelled else None),
         "tool_concept": base.tooling_concept or None,
         "cost_share_pct": {d.label: round(d.share * 100) for d in report.cost_drivers[:4]},
         "tooling_materials": [

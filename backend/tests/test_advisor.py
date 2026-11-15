@@ -100,6 +100,9 @@ class SummaryTests(unittest.TestCase):
         # About four characters per token: keep the input well under 1,000 tokens.
         self.assertLess(len(text), 3000)
         self.assertEqual(facts["tool_price"], round(build_report(request).base.total_price))
+        # 150,000 shots against a ~100,000-shot cavity: one replacement set.
+        self.assertEqual(facts["tool_life"]["replacement_sets"], 1)
+        self.assertGreater(facts["tool_life"]["lifetime_tooling_cost"], facts["tool_price"])
 
     def test_summary_is_cached_and_sends_only_facts(self):
         with mock.patch.object(summary, "_post", return_value=fake_openai(SUMMARY_JSON)) as post:
