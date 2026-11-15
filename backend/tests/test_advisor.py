@@ -138,6 +138,32 @@ class SummaryTests(unittest.TestCase):
         self.assertEqual(len(calls), 2)
         self.assertNotIn("reasoning", calls[1])
 
+    def test_default_effort_is_none(self):
+        with mock.patch.object(summary, "_post", return_value=fake_openai(SUMMARY_JSON)) as post:
+            self.client.post("/api/advanced-report/summary", json=self.payload)
+        self.assertEqual(post.call_args.args[1]["reasoning"], {"effort": "none"})
+
+    def test_retries_with_a_supported_effort(self):
+        # The exact error gpt-6-luna returned for effort "minimal".
+        error = ("AI summary request failed (400). Unsupported value: 'minimal' is not supported with the 'gpt-6-luna' "
+                 "model. Supported values are: 'none', 'low', 'medium', 'high', 'xhigh', and 'max'.")
+        calls = []
+
+        def post(settings, body):
+            calls.append(dict(body))
+            if body["reasoning"]["effort"] == "minimal":
+                raise summary.SummaryUnavailableError(error)
+            return fake_openai(SUMMARY_JSON)
+
+        with mock.patch.dict("os.environ", {"SUMMARY_REASONING_EFFORT": "minimal"}), \
+                mock.patch.object(summary, "_post", side_effect=post):
+            response = self.client.post("/api/advanced-report/summary", json=self.payload)
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual([c["reasoning"]["effort"] for c in calls], ["minimal", "none"])
+        self.assertEqual(summary.cheapest_supported_effort(error), "none")
+        self.assertEqual(summary.cheapest_supported_effort("Supported values are: 'low', 'high'."), "low")
+        self.assertIsNone(summary.cheapest_supported_effort("Rate limit reached."))
+
     def test_missing_key_is_503(self):
         with mock.patch.dict("os.environ", {"OPENAI_API_KEY": ""}):
             response = self.client.post("/api/advanced-report/summary", json=self.payload)
