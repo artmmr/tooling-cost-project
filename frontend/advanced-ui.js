@@ -121,6 +121,11 @@ const AdvancedUI = (() => {
     const life = report?.tool_life;
     $("sb-per-part").textContent = money0(report ? report.tooling_per_part : result.total_price / Number(value("inp-expected-cycles")));
     $("sb-lifetime").textContent = money0(life ? life.lifetime_cost : result.total_price);
+    $("pc-per-part").textContent = $("sb-per-part").textContent;
+    $("pc-lifetime").textContent = life?.replacements
+      ? `${money0(life.lifetime_cost)} (${life.replacements} replacement set${life.replacements > 1 ? "s" : ""})`
+      : money0(life ? life.lifetime_cost : result.total_price);
+    $("pc-steel").textContent = report?.base.recommended_material || result.recommended_material || result.tooling_material || "—";
     $("sb-life-note").textContent = life?.replacements ? `incl. ${life.replacements} replacement set${life.replacements > 1 ? "s" : ""}` : "no replacements";
     $("sb-state").textContent = "Up to date";
     $("sb-state").dataset.stale = "false";
@@ -271,6 +276,15 @@ const AdvancedUI = (() => {
       mark(atEnd && bestTop > -Infinity ? links.at(-1) : best);
     };
     window.addEventListener("scroll", () => { frame ||= requestAnimationFrame(update); }, {passive: true});
+    // Links into the report (price card, menu) open a collapsed card on phones.
+    document.querySelectorAll('a[href^="#rs-"]').forEach(a => {
+      if (links.includes(a)) return;
+      a.addEventListener("click", () => {
+        const target = document.querySelector(a.getAttribute("href"));
+        const card = target?.closest(".collapsible") || target?.querySelector?.(".collapsible");
+        if (card) expand(card, true);
+      });
+    });
     links.forEach((a, i) => a.addEventListener("click", () => {
       const card = targets[i]?.closest(".collapsible") || targets[i]?.querySelector?.(".collapsible");
       if (card) expand(card, true);
